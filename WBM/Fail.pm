@@ -30,13 +30,17 @@ sub invoke($self) {
         full_text   => $self->{text},
         icon        => "%utf8{f09f9eaa}",
         color       => "ff5f00",
+        cache       => "+inf",
     };
 
+    $self->log->info("invoked");
     if ($self->{first}) {
-        $ret->{blink}     = 6;
-        $self->{first}  = 0;
-    } elsif(!$self->{dismissed}) {
-        $ret->{inverse}   = 1;
+        $ret->{blink}       = 6;
+        $self->{first}      = 0;
+    }
+
+    if (!$self->{dismissed}) {
+        $ret->{invert}      = "+inf";
     }
 
     return $ret;

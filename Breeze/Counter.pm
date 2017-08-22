@@ -10,6 +10,14 @@ no  warnings    qw(experimental::signatures);
 
 use Carp;
 
+use overload
+    "+="    => \&op_peq,
+    "-="    => \&op_meq,
+    "="     => \&op_assign,
+    "bool"  => \&op_bool,
+    '""'    => \&op_scalar,
+    "0+"    => \&op_scalar;
+
 sub from($self)     { $self->{from};    }
 sub to($self)       { $self->{to};      }
 sub cycle($self)    { $self->{cycle};   }
@@ -78,6 +86,35 @@ sub prev($self) {
 
 sub reset($self) {
     return $self->{current} = $self->{start};
+}
+
+sub clone($self) {
+    my %attrs = %$self;
+    delete $attrs{start};
+    return __PACKAGE__->new(%attrs);
+}
+
+# operators
+sub op_bool($self, $, $) {
+    return $self->{current} != $self->{from};
+}
+
+sub op_scalar($self, $, $) {
+    return $self->{current};
+}
+
+sub op_peq($self, $o, $swap) {
+    $self->next foreach (1..$o);
+    return $self;
+}
+
+sub op_meq($self, $o, $swap) {
+    $self->prev foreach (1..$o);
+    return $self;
+}
+
+sub op_assign($self, $, $) {
+    return $self->clone;
 }
 
 # vim: syntax=perl5-24

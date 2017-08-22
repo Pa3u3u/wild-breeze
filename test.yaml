@@ -6,8 +6,8 @@
 #   - %STDERR     write to stderr
 #   - null        disable logging entirely
 #logfile: "/tmp/breeze-$$.log"
-#logfile: %STDERR
-logfile: null
+logfile: %STDERR
+#logfile: null
 
 # Turn debugging on or off.
 #
@@ -44,6 +44,11 @@ timeouts: 3
 # Values: positive integers
 failures: 3
 
+# Spaces to add around full_text entries.
+#
+# Values: non-negative integers
+padding: 1
+
 # Default values for output entry.
 defaults:
     background: 002b36
@@ -58,9 +63,19 @@ defaults:
 modules:
     # leading separator
     - separator
+    - -name:        fail
+      -driver:      WBM::Fail
+      text:         "FAILURE"
+    - separator
+    - -name:        time-2
+      -driver:      WBM::Time2
+      -refresh:     0
+      format:       "%a %y-%m-%d %H:%M:%S"
+      icon:         %utf8{ef809720}
+    - separator
     - -name:        time
       -driver:      WBM::Time
-      -refresh:     1
+      -refresh:     0
       format:       "%a %y-%m-%d %H:%M:%S"
       icon:         %utf8{ef809720}
     # add trailing separator

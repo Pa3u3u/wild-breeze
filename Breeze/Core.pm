@@ -8,11 +8,13 @@ use warnings;
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
+use Breeze::Cache;
 use Breeze::Counter;
 use Breeze::Logger;
 use Breeze::Logger::File;
 use Breeze::Logger::StdErr;
 use Carp;
+use Data::Dumper;
 use JSON::XS;
 use Module::Load;
 use Time::Out   qw(timeout);
@@ -20,7 +22,8 @@ use Try::Tiny;
 
 sub new($class, $config) {
     my $self = {
-        config => $config,
+        config  => $config,
+        cache   => Breeze::Cache->new,
     };
 
     bless $self, $class;
@@ -32,8 +35,9 @@ sub new($class, $config) {
 }
 
 # getters
-sub cfg($self) { $self->{config}; }
-sub log($self) { $self->{logger}; }
+sub cfg($self)      { $self->{config}; }
+sub log($self)      { $self->{logger}; }
+sub cache($self)    { $self->{cache};  }
 
 sub mod($self, $name = undef) {
     return $self->{mods} if !defined $name;
@@ -154,45 +158,56 @@ sub init_modules($self) {
             };
 
             push $self->{mods}->@*, $entry;
-            $self->{mods_by_name} = $entry;
+            $self->{mods_by_name}->{$modname} = $entry;
         }
     }
 }
-
 sub run($self) {
     my $ret;
 
     foreach my $entry ($self->mod->@*) {
         # separators will be handled in postprocessing
         if (exists $entry->{separator}) {
-            push @$ret, $entry;
+            push @$ret, { %$entry };
             next;
         }
 
-        # TODO cache
+        # try to get cached output first
+        $self->log->debug("looking for $entry->{conf}->{-name}");
+        my $data = $self->cache->get($entry->{conf}->{-name});
 
-        # handle module with timeout
-        my $data = timeout($self->cfg->{timeout} => sub {
-            return try {
-                $entry->{mod}->invoke;
-            } catch {
-                chomp $_;
-                $self->log->error("error in '$entry->{conf}->{-name}' ($entry->{conf}->{-driver})");
-                $self->log->error($_);
-                undef;
-            };
-        });
+        if (!defined $data) {
+            $data = timeout($self->cfg->{timeout} => sub {
+                return try {
+                    $entry->{mod}->invoke;
+                } catch {
+                    chomp $_;
+                    $self->log->error("error in '$entry->{conf}->{-name}' ($entry->{conf}->{-driver})");
+                    $self->log->error($_);
+                    undef;
+                };
+            });
 
-        # module timeouted?
-        if ($@) {
-            $data = $self->timeout_module($entry);
-        # module failed?
-        } elsif (!defined $data) {
-            $data = $self->fail_module($entry);
+            # module timeouted?
+            if ($@) {
+                $data = $self->timeout_module($entry);
+            # module failed?
+            } elsif (!defined $data) {
+                $data = $self->fail_module($entry);
+            }
+        } else {
+            # ignore cached 'blink' and 'invert'
+            delete $data->@{qw(blink invert)};
         }
 
         # set entry and instance
         $data->@{qw(entry instance)} = $entry->{conf}->@{qw(-name -name)};
+
+        if (($entry->{conf}->{-refresh} // 0) >= 1) {
+            $self->cache->set($entry->{conf}->{-name}, $data, $entry->{conf}->{-refresh});
+        } elsif (defined $data->{cache} && $data->{cache} >= 0) {
+            $self->cache->set($entry->{conf}->{-name}, $data, $data->{cache});
+        }
 
         push @$ret, $data;
     }
@@ -206,7 +221,6 @@ sub run($self) {
 sub u8($self, $what) {
     my $t = join("", map { chr(hex) } ($what =~ m/../g));
     utf8::decode($t);
-    $self->log->info("decoded '$what' to be '$t'");
     return $t;
 }
 
@@ -234,19 +248,93 @@ sub post_process_seg($self, $ret) {
         } elsif (defined $data->{text}) {
             $data->{full_text} = $data->{text};
         }
+    }
+}
 
-        # cleanup
-        delete $data->@{qw(text icon)};
+sub get_or_set_timer($self, $key, $timer, $ticks) {
+    my $timers = $self->mod($key)->{tmrs};
+
+    print STDERR "timers for '$key'\n";
+    print STDERR Dumper($timers);
+    # nothing to do if no timer set and ticks is undefined
+    return if !defined $timers->{$timer} && !defined $ticks;
+
+    # create timer if there is none
+    $timers->{$timer} = Breeze::Counter->new(current => $ticks)
+        if !defined $timers->{$timer};
+
+    # return a reference to the timer
+    return \$timers->{$timer};
+}
+
+sub delete_timer($self, $key, $timer) {
+    delete $self->mod($key)->{tmrs}->{$timer};
+}
+
+sub post_process_inversion($self, $ret) {
+    foreach my $seg (@$ret) {
+        # separators are not supposed to blink
+        next if exists $seg->{separator};
+
+        print STDERR "invert $seg->{entry}\n";
+        my $timer = $self->get_or_set_timer($seg->{entry}, "invert", $seg->{invert});
+        next if !defined $timer;
+
+        # advance timer
+        my $tick  = (--$$timer)->current;
+
+        # use xor to invert blinking if 'invert' flag is already set
+        $seg->{invert} = 1 if $tick >= 0;
+
+        # remove timer if expired
+        $self->delete_timer($seg->{entry}, "invert") unless $tick;
+    }
+}
+
+sub post_process_blinking($self, $ret) {
+    foreach my $seg (@$ret) {
+        # separators are not supposed to blink
+        next if exists $seg->{separator};
+
+        print STDERR "blink $seg->{entry}\n";
+        my $timer = $self->get_or_set_timer($seg->{entry}, "blink", $seg->{blink});
+        next if !defined $timer;
+
+        # advance timer
+        my $tick = (--$$timer)->current;
+
+        # use xor to invert blinking if 'invert' flag is already set
+        $seg->{invert} = ($seg->{invert} xor ($tick % 2 == 0));
+
+        # remove timer if expired
+        $self->delete_timer($seg->{entry}, "blink") unless $tick;
+    }
+}
+
+sub post_process_inverted($self, $ret) {
+    foreach my $seg (@$ret) {
+        # separators are not to be inverted (here)
+        next if exists $seg->{separator};
+
+        if ($seg->{invert}) {
+            # set sane defaults
+            foreach (qw(color background)) {
+                $seg->{$_} = $self->cfg->{defaults}->{$_}
+                    unless defined $seg->{$_};
+            }
+
+            $seg->@{qw(color background)} = $seg->@{qw(background color)};
+        }
     }
 }
 
 sub post_process_sep($self, $ret) {
     my $default_bg = $self->cfg->{defaults}->{background};
 
+    my $counter = 0;
     foreach my $ix (0..$#$ret) {
         my $sep = $ret->[$ix];
         next if !exists $sep->{separator};
-        delete $sep->{separator};
 
         # set separator icon
         $sep->{full_text} = "%utf8{ee82b2}";
@@ -263,6 +351,9 @@ sub post_process_sep($self, $ret) {
             delete $sep->{border};
             $sep->{background} = $ret->[$ix - 1]->{background} // $default_bg;
         }
+
+        $sep->{entry} = $sep->{instance} = "__separator_$counter";
+        ++$counter;
     }
 }
 
@@ -275,8 +366,15 @@ sub post_process_attr($self, $ret) {
             }
         }
 
-        # replace 'utf8{byte}' with utf8 character
+        # replace '%utf8{byte}' with utf8 character
         $seg->{full_text} =~ s/%utf8\{(.*?)\}/$self->u8($1)/ge;
+
+        # add padding if requested
+        if ($self->cfg->{padding} && $seg->{entry} !~ m/^__separator_/) {
+            my $pad = " " x $self->cfg->{padding};
+            $seg->{full_text} =~ s/^(\S)/$pad$1/;
+            $seg->{full_text} =~ s/(\S)$/$1$pad/;
+        }
 
         # set separator width and distance
         $seg->{separator} = JSON::XS::false;
@@ -288,11 +386,24 @@ sub post_process($self, $ret) {
     # process all module segments
     $self->post_process_seg($ret);
 
-    # process separator segments
+    # process inversion and blinking
+    # (colors must be figured before computing separators)
+    $self->post_process_inversion($ret);
+    $self->post_process_blinking($ret);
+
+    # process inverted elements
+    $self->post_process_inverted($ret);
+
+    # process separator segment
     $self->post_process_sep($ret);
 
     # fix colors and utf8 characters
     $self->post_process_attr($ret);
+
+    # cleanup tags
+    foreach my $seg (@$ret) {
+        delete $seg->@{qw(separator text icon blink invert)};
+    }
 }
 
 # vim: syntax=perl5-24
