@@ -5,20 +5,22 @@ use utf8;
 use strict;
 use warnings;
 
-use lib     ".";
+use FindBin     qw($Bin);
+use lib         "$Bin";
 
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
 use Breeze::Core;
+use Breeze::I3;
 use Carp;
 use Data::Dumper;
 use File::Slurp;
-use FindBin         qw($Bin);
 use Getopt::Long    qw(:config bundling);
 use JSON::XS;
 use Pod::Usage;
 use IO::Select;
+use Try::Tiny;
 use YAML::Syck;
 
 #-------------------------------------------------------------------------------
@@ -44,19 +46,15 @@ sub read_config($filename) {
 # Entry
 #-------------------------------------------------------------------------------
 
-# initialize config and options
-my $config      = {};
+# set encoding on all input and output streams, decode ARGV
+binmode $_, ":encoding(utf-8)" foreach (*STDIN, *STDOUT, *STDERR);
+utf8::decode($_) foreach @ARGV;
+
+# initialize and process optionss
 my $options     = {
     conf    => "$ENV{HOME}/.config/wbreeze.yaml",
 };
 
-# set encoding on all input and output streams
-binmode $_, ":encoding(utf-8)" foreach (*STDIN, *STDOUT, *STDERR);
-
-# encode argv to utf-8 first
-utf8::decode($_) foreach @ARGV;
-
-# get options
 GetOptions($options, qw(man|help h))
     or pod2usage({ -exitval => 1, -verbose => 1 });
 
@@ -68,41 +66,52 @@ if (@ARGV == 1) {
 }
 
 # read configuration file
-$config = read_config($options->{conf});
+my $config = read_config($options->{conf});
 
 # set up JSON event parser
 my $ev_parser   = JSON::XS->new->utf8(0);
 my $ev_started  = 0;
 
-# set up Breeze
+# set up Breeze and I3 stuff
+my $i3     = Breeze::I3->new();
 my $breeze = Breeze::Core->new($config);
-my $log    = $breeze->log->clone(category => "CORE");
-
-print Dumper($breeze->{mods});
+my $log    = $breeze->log->clone(category => "wild-breeze");
 
 # set up IO::Select
 my $select = IO::Select->new(*STDIN)
     or $log->fatal("failed to set up IO::Select");
 
-# print protocol setup
+#-------------------------------------------------------------------------------
+
+# turn off buffering
+$| = 1;
+
+# let's roll
+$i3->start;
 
 # enter the main loop
 MAIN_LOOP:
 while (1) {
     # print output
-    # $breeze->run;
+    my $data = try {
+        return $breeze->run;
+    } catch {
+        chomp $_;
+        $log->error("fatal error in run handler");
+        $log->error($_);
+        $log->fatal("cannot continue");
+    };
+
+    $i3->next($data);
 
     # wait for an event, at most a second by default
     foreach my $hndl ($select->can_read($config->{tick} // 1)) {
         my $line = <$hndl>;
         last MAIN_LOOP unless defined $line;
         chomp $line;
-        print "# got line $line\n";
 
         # add data to parser
         $ev_parser->incr_parse($line);
-
-        print "parser text: '", $ev_parser->incr_text, "'\n";
 
         # first, get rid of leading '['
         if (!$ev_started && $ev_parser->incr_text =~ s/^\s*\[//) {
@@ -119,7 +128,7 @@ while (1) {
         # remove separators and process events
         $ev_parser->incr_text =~ s/^\s*,//;
         while (my $event = $ev_parser->incr_parse) {
-            print Dumper($event);
+            $log->error("event processing is not yet implemented");
             $ev_parser->incr_text =~ s/^\s*,//;
         }
     }

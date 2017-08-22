@@ -9,8 +9,28 @@ use parent      qw(WBM::Driver);
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
+use Carp;
+use Time::Format    qw(%strftime);
+
 sub new($class, %args) {
-    return bless {}, $class;
+    my $self = $class->SUPER::new(%args);
+
+    croak "missing 'format' parameter in constructor"
+        unless defined $args{format};
+
+    croak "missing 'icon' parameter in constructor"
+        unless defined $args{icon};
+
+    $self->{format} = $args{format};
+    $self->{icon}   = $args{icon};
+    return $self;
+}
+
+sub invoke($self) {
+    return {
+        text    => $strftime{$self->{format}, localtime},
+        icon    => $self->{icon},
+    };
 }
 
 # vim: syntax=perl5-24

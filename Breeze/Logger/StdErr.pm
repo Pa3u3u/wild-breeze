@@ -49,4 +49,6 @@ sub debug($self, @msg) {
         colored(join("", @msg), "ansi242");
 }
 
+# vim: syntax=perl5-24
+
 1;

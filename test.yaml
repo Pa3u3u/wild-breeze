@@ -6,8 +6,8 @@
 #   - %STDERR     write to stderr
 #   - null        disable logging entirely
 #logfile: "/tmp/breeze-$$.log"
-logfile: %STDERR
-#logfile: null
+#logfile: %STDERR
+logfile: null
 
 # Turn debugging on or off.
 #
@@ -22,25 +22,46 @@ perfmon: yes
 
 # A duration between 'ticks'. All intervals here are 'ticks'. If this
 # value is set to 1 (as it should be), all ticks are equivalent to seconds.
+#
+# Values: positive integers
 tick: 1
+
+# Number of seconds available for a module to print its output.
+# This value is used with Time::HiRes, so it can be a fractional number.
+#
+# Values: positive fractionals
+timeout: 0.3
+
+# Number of timeouts before the module is disabled entirely. This should be
+# at least 1, otherwise all modules would have to be disabled instantly.
+#
+# Values: positive integers
+timeouts: 3
+
+# Number of failures a module can cause, either by runnin 'invoke' or
+# an event handler. After that, the module is disabled.
+#
+# Values: positive integers
+failures: 3
 
 # Default values for output entry.
 defaults:
-    background: null
-    color:      1c1c1c
-    border:     %background
-# The following two will be _always_ set up by wind-breeze.
+    background: 002b36
+    color:      93a1a1
+    border:     null
+#   the following two will be _always_ set up by wind-breeze.
 #   separator:              no
 #   separator_block_width:  0
 
-# Modules
+# Module descriptions. The following modules will be displayed from left
+# to right as they appear in this array of objects.
 modules:
+    # leading separator
+    - separator
     - -name:        time
       -driver:      WBM::Time
       -refresh:     1
-      format:       "%a %y-%m-%d %H-%M-%S"
-      icon:         %utf8{f09f9590}
+      format:       "%a %y-%m-%d %H:%M:%S"
+      icon:         %utf8{ef809720}
+    # add trailing separator
     - separator
-    - -name:        time2
-      -driver:      WBM::Time
-      -refresh:     2
