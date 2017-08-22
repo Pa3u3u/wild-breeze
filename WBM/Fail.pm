@@ -33,7 +33,6 @@ sub invoke($self) {
         cache       => "+inf",
     };
 
-    $self->log->info("invoked");
     if ($self->{first}) {
         $ret->{blink}       = 6;
         $self->{first}      = 0;

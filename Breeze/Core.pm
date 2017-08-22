@@ -120,7 +120,7 @@ sub init_modules($self) {
                 chomp $_;
                 $self->log->error("failed to initialize '$modname'");
                 $self->log->error($_);
-                return undef;
+                return;
             };
 
             # module failed to initialize?
@@ -173,7 +173,6 @@ sub run($self) {
         }
 
         # try to get cached output first
-        $self->log->debug("looking for $entry->{conf}->{-name}");
         my $data = $self->cache->get($entry->{conf}->{-name});
 
         if (!defined $data) {
@@ -197,7 +196,7 @@ sub run($self) {
             }
         } else {
             # ignore cached 'blink' and 'invert'
-            delete $data->@{qw(blink invert)};
+            delete $data->@{qw(blink invert cache)};
         }
 
         # set entry and instance
@@ -231,7 +230,7 @@ sub post_process_seg($self, $ret) {
 
         # add defaults
         while (my ($k, $v) = each $self->cfg->{defaults}->%*) {
-            $data->{$k} = $v unless exists $data->{$k};
+            $data->{$k} = $v if !exists $data->{$k} && defined $v;
         }
 
         # copy colors if required
@@ -254,8 +253,6 @@ sub post_process_seg($self, $ret) {
 sub get_or_set_timer($self, $key, $timer, $ticks) {
     my $timers = $self->mod($key)->{tmrs};
 
-    print STDERR "timers for '$key'\n";
-    print STDERR Dumper($timers);
     # nothing to do if no timer set and ticks is undefined
     return if !defined $timers->{$timer} && !defined $ticks;
 
@@ -276,7 +273,6 @@ sub post_process_inversion($self, $ret) {
         # separators are not supposed to blink
         next if exists $seg->{separator};
 
-        print STDERR "invert $seg->{entry}\n";
         my $timer = $self->get_or_set_timer($seg->{entry}, "invert", $seg->{invert});
         next if !defined $timer;
 
@@ -296,7 +292,6 @@ sub post_process_blinking($self, $ret) {
         # separators are not supposed to blink
         next if exists $seg->{separator};
 
-        print STDERR "blink $seg->{entry}\n";
         my $timer = $self->get_or_set_timer($seg->{entry}, "blink", $seg->{blink});
         next if !defined $timer;
 
@@ -376,7 +371,7 @@ sub post_process_attr($self, $ret) {
             $seg->{full_text} =~ s/(\S)$/$1$pad/;
         }
 
-        # set separator width and distance
+        # remove i3status separator
         $seg->{separator} = JSON::XS::false;
         $seg->{separator_block_width} = 0;
     }

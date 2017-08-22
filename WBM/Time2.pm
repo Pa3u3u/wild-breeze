@@ -31,8 +31,7 @@ sub invoke($self) {
     my $ret = {
         text        => $strftime{$self->{format}, localtime},
         icon        => $self->{icon},
-        background  => '660033',
-        color       => 'ffffff',
+        color       => 'fabd2f',
     };
 
     $ret->{invert} = 8 if $self->{first};

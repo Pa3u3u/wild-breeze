@@ -38,7 +38,6 @@ sub set($self, $key, $value, $recall = 1) {
         { %$value },
     ];
 
-    print STDERR "cache stored ", Dumper($value);
     # do not return entry
     return;
 }
