@@ -1,0 +1,47 @@
+package WBM::Fail;
+
+use v5.26;
+use utf8;
+use strict;
+use warnings;
+
+use parent      qw(WBM::Driver);
+use feature     qw(signatures);
+no  warnings    qw(experimental::signatures);
+
+sub new($class, %args) {
+    my $self = $class->SUPER::new(%args);
+
+    $self->log->fatal("missing 'text' parameter in constructor")
+        unless defined $args{text};
+
+    $self->{text}   = $args{text};
+    $self->{first}  = 1;
+    return $self;
+}
+
+sub refresh_on_event($self) { 1; }
+sub on_left_click($self)    { $self->{dismissed} = 1; }
+sub on_middle_click($self)  { $self->{dismissed} = 1; }
+sub on_right_click($self)   { $self->{dismissed} = 1; }
+
+sub invoke($self) {
+    my $ret = {
+        full_text   => $self->{text},
+        icon        => "%utf8{f09f9eaa}",
+        color       => "ff5f00",
+    };
+
+    if ($self->{first}) {
+        $ret->{blink}     = 6;
+        $self->{first}  = 0;
+    } elsif(!$self->{dismissed}) {
+        $ret->{inverse}   = 1;
+    }
+
+    return $ret;
+}
+
+# vim: syntax=perl5-24
+
+1;

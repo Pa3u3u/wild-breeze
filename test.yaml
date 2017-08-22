@@ -1,0 +1,46 @@
+# Log file location. The filename can contain '$$' which will be replaced
+# by the PID of the program.
+#
+# Values:
+#   - string      write to a file
+#   - %STDERR     write to stderr
+#   - null        disable logging entirely
+#logfile: "/tmp/breeze-$$.log"
+logfile: %STDERR
+#logfile: null
+
+# Turn debugging on or off.
+#
+# Values: (yes|no)
+debug: yes
+
+# Show performance component in the first position. Usually useful only
+# for debugging.
+#
+# Values: (yes|no)
+perfmon: yes
+
+# A duration between 'ticks'. All intervals here are 'ticks'. If this
+# value is set to 1 (as it should be), all ticks are equivalent to seconds.
+tick: 1
+
+# Default values for output entry.
+defaults:
+    background: null
+    color:      1c1c1c
+    border:     %background
+# The following two will be _always_ set up by wind-breeze.
+#   separator:              no
+#   separator_block_width:  0
+
+# Modules
+modules:
+    - -name:        time
+      -driver:      WBM::Time
+      -refresh:     1
+      format:       "%a %y-%m-%d %H-%M-%S"
+      icon:         %utf8{f09f9590}
+    - separator
+    - -name:        time2
+      -driver:      WBM::Time
+      -refresh:     2

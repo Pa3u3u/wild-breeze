@@ -1,0 +1,128 @@
+#!/usr/bin/perl
+
+use v5.26;
+use utf8;
+use strict;
+use warnings;
+
+use lib     ".";
+
+use feature     qw(signatures);
+no  warnings    qw(experimental::signatures);
+
+use Breeze::Core;
+use Carp;
+use Data::Dumper;
+use File::Slurp;
+use FindBin         qw($Bin);
+use Getopt::Long    qw(:config bundling);
+use JSON::XS;
+use Pod::Usage;
+use IO::Select;
+use YAML::Syck;
+
+#-------------------------------------------------------------------------------
+# Configuration
+#-------------------------------------------------------------------------------
+
+$YAML::Syck::ImplicitTyping     = 1;
+$YAML::Syck::ImplicitUnicode    = 1;
+
+#-------------------------------------------------------------------------------
+# Subroutines
+#-------------------------------------------------------------------------------
+
+sub read_config($filename) {
+    open my $fh, "<:encoding(utf-8)", $filename
+        or die "$filename: $!\n";
+
+    return LoadFile($fh);
+    # $fh gets closed when it goes out of scope
+}
+
+#-------------------------------------------------------------------------------
+# Entry
+#-------------------------------------------------------------------------------
+
+# initialize config and options
+my $config      = {};
+my $options     = {
+    conf    => "$ENV{HOME}/.config/wbreeze.yaml",
+};
+
+# set encoding on all input and output streams
+binmode $_, ":encoding(utf-8)" foreach (*STDIN, *STDOUT, *STDERR);
+
+# encode argv to utf-8 first
+utf8::decode($_) foreach @ARGV;
+
+# get options
+GetOptions($options, qw(man|help h))
+    or pod2usage({ -exitval => 1, -verbose => 1 });
+
+if (@ARGV == 1) {
+    $options->{conf} = $ARGV[0];
+} elsif (@ARGV > 1) {
+    print STDERR "Too many arguments.\nTry '$0 -h' for help.\n";
+    exit 1;
+}
+
+# read configuration file
+$config = read_config($options->{conf});
+
+# set up JSON event parser
+my $ev_parser   = JSON::XS->new->utf8(0);
+my $ev_started  = 0;
+
+# set up Breeze
+my $breeze = Breeze::Core->new($config);
+my $log    = $breeze->log->clone(category => "CORE");
+
+print Dumper($breeze->{mods});
+
+# set up IO::Select
+my $select = IO::Select->new(*STDIN)
+    or $log->fatal("failed to set up IO::Select");
+
+# print protocol setup
+
+# enter the main loop
+MAIN_LOOP:
+while (1) {
+    # print output
+    # $breeze->run;
+
+    # wait for an event, at most a second by default
+    foreach my $hndl ($select->can_read($config->{tick} // 1)) {
+        my $line = <$hndl>;
+        last MAIN_LOOP unless defined $line;
+        chomp $line;
+        print "# got line $line\n";
+
+        # add data to parser
+        $ev_parser->incr_parse($line);
+
+        print "parser text: '", $ev_parser->incr_text, "'\n";
+
+        # first, get rid of leading '['
+        if (!$ev_started && $ev_parser->incr_text =~ s/^\s*\[//) {
+            $ev_started = 1;
+        } elsif (!$ev_started) {
+            next;
+        }
+
+        # exit if we encounter ']'
+        if ($ev_parser->incr_text =~ s/^\s*\]//) {
+            last MAIN_LOOP;
+        }
+
+        # remove separators and process events
+        $ev_parser->incr_text =~ s/^\s*,//;
+        while (my $event = $ev_parser->incr_parse) {
+            print Dumper($event);
+            $ev_parser->incr_text =~ s/^\s*,//;
+        }
+    }
+}
+
+# vim: syntax=perl5-24
