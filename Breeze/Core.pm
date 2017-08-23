@@ -20,6 +20,7 @@ use Module::Load;
 use Time::HiRes;
 use Time::Out   qw(timeout);
 use Try::Tiny;
+use WBM::Fail;
 
 sub new($class, $config) {
     my $self = {
@@ -254,24 +255,23 @@ sub run($self) {
         my $data = $self->cache->get($entry->{conf}->{-name});
 
         if (!defined $data) {
-            $data = timeout($self->cfg->{timeout} => sub {
-                return try {
-                    $entry->{mod}->invoke;
-                } catch {
-                    chomp $_;
-                    $self->log->error("error in '$entry->{conf}->{-name}' ($entry->{conf}->{-driver})");
-                    $self->log->error($_);
-                    undef;
-                };
-            });
+            $data = try {
+                my $tmp = timeout($self->cfg->{timeout} => sub {
+                    return $entry->{mod}->invoke;
+                });
 
-            # module timeouted?
-            if ($@) {
-                $data = $self->fail_module($entry, "timeout");
-            # module failed?
-            } elsif (!defined $data) {
-                $data = $self->fail_module($entry, "fail");
-            }
+                if ($@) {
+                    $self->log->error("module '$entry->{conf}->{-name}' timeouted");
+                    return $self->fail_module($entry, "timeout");
+                }
+
+                return $tmp;
+            } catch {
+                chomp $_;
+                $self->log->error("error in '$entry->{conf}->{-name}' ($entry->{conf}->{-driver})");
+                $self->log->error($_);
+                return $self->fail_module($entry, "fail");
+            };
         } else {
             # ignore cached 'blink', 'invert', 'reset_blink' and 'reset_invert'
             delete $data->@{qw(blink invert cache reset_blink reset_invert reset_all)};
@@ -496,27 +496,49 @@ sub event($self, $event) {
     my $mod    = $self->mod($target);
 
     if (!defined $mod) {
-        $self->log->error("got event for unknown module '$event->{entry}'");
+        $self->log->error("got event for unknown module '$target'");
         return;
     }
 
     my $button = $self->event_button($event->{button});
     my $data = try {
         if ($mod->{mod}->refresh_on_event) {
-            $self->cache->flush($mod->{conf}->{-name});
+            $self->cache->flush($target);
         }
 
-        if (!defined $button) {
-            $self->log->error("got unknown event '$event->{button}' for '$event->{entry}'");
-            return $mod->{mod}->on_event;
-        } else {
-            my $method = "on_$button";
-            return $mod->{mod}->$method;
+        my $tmp = timeout($self->cfg->{timeout} => sub {
+            if (!defined $button) {
+                $self->log->error("got unknown event '$event->{button}' for '$target'");
+                return $mod->{mod}->on_event;
+            } else {
+                my $method = "on_$button";
+                return $mod->{mod}->$method;
+            }
+        });
+
+        if ($@) {
+            $self->log->error("event for '$target' timeouted");
+
+            # flush cache and replace entry with failed placeholder
+            $self->cache->flush($target);
+            my $ret = $self->fail_module($mod, "timeout");
+            $ret->{text} .= "[event]";
+            $self->cache->set($target, $ret, $self->cfg->{cooldown});
+            return $ret;
         }
+
+        return $tmp;
     } catch {
         chomp $_;
-        $self->log->error("event handler failed");
+        $self->log->error("event for '$target' failed");
         $self->log->error($_);
+
+        # flush cache and replace entry with failed placeholder
+        $self->cache->flush($target);
+        my $ret = $self->fail_module($mod, "fail");
+        $ret->{text} .= "[event]";
+        $self->cache->set($target, $ret, $self->cfg->{cooldown});
+        return $ret;
     };
 
     if (defined $data and ref $data eq "HASH") {

@@ -31,19 +31,19 @@ sub get($self, $key) {
 
     # if entry was zero, the key expired, delete it and move on
     if (!$entry->[0]--) {
-        $self->log->debug("cached key for '", $key, "' expired upon request");
+#       $self->log->debug("cached key for '", $key, "' expired upon request");
         delete $self->{storage}->{$key};
         return;
     }
 
-    $self->log->debug("returning cached value for '", $key, "'");
+#   $self->log->debug("returning cached value for '", $key, "'");
     return { $entry->[1]->%* };
 }
 
 sub set($self, $key, $value, $recall = 1) {
     return if exists $self->{storage}->{$key};
 
-    $self->log->debug("setting a new entry for '", $key, "'");
+#   $self->log->debug("setting a new entry for '", $key, "'");
     $self->{storage}->{$key} = [
         Breeze::Counter->new(current => $recall),
         { %$value },
@@ -56,11 +56,11 @@ sub set($self, $key, $value, $recall = 1) {
 sub flush($self, @keys) {
     # on total flush, just recreate storage
     if (!@keys) {
-        $self->log->debug("flushing all entries");
+#       $self->log->debug("flushing all entries");
         $self->{storage} = {};
     # delete selected keys
     } else {
-        $self->log->debug("flushing keys '", join(",", @keys), "'");
+#       $self->log->debug("flushing keys '", join(",", @keys), "'");
         delete $self->{storage}->@{@keys};
     }
 }

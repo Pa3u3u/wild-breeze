@@ -27,10 +27,6 @@ sub new($class, %args) {
 }
 
 sub invoke($self) {
-    if (rand(100) < 30) {
-        sleep 60;
-    }
-
     return {
         text    => $strftime{$self->{format}, localtime},
         icon    => $self->{icon},
