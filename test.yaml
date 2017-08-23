@@ -5,8 +5,8 @@
 #   - string      write to a file
 #   - %STDERR     write to stderr
 #   - null        disable logging entirely
-#logfile: "/tmp/breeze-$$.log"
-logfile: %STDERR
+logfile: "/tmp/breeze.log"
+#logfile: %STDERR
 #logfile: null
 
 # Turn debugging on or off.
@@ -63,15 +63,12 @@ defaults:
 modules:
     # leading separator
     - separator
-    - -name:        fail
-      -driver:      WBM::Fail
-      text:         "FAILURE"
-    - separator
-    - -name:        time-2
-      -driver:      WBM::Time2
+    - -name:        volume
+      -driver:      WBM::PAMixer
       -refresh:     0
-      format:       "%a %y-%m-%d %H:%M:%S"
-      icon:         %utf8{ef809720}
+      sink:         alsa_output.pci-0000_00_1b.0.analog-stereo
+      allow-boost:  yes
+      step:         2
     - separator
     - -name:        time
       -driver:      WBM::Time

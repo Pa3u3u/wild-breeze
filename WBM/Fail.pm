@@ -27,10 +27,10 @@ sub on_right_click($self)   { $self->{dismissed} = 1; }
 
 sub invoke($self) {
     my $ret = {
-        full_text   => $self->{text},
-        icon        => "%utf8{f09f9eaa}",
-        color       => "ff5f00",
-        cache       => "+inf",
+        text    => $self->{text},
+        icon    => "",
+        color   => "dc322f",
+        cache   => "+inf",
     };
 
     if ($self->{first}) {

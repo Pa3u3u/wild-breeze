@@ -8,12 +8,12 @@ use warnings;
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
-use JSON::XS;
+use Devel::Peek;
+use JSON;
 
 sub new($class) {
     return bless {
-        first   => 1,
-        json    => JSON::XS->new->utf8(0)->pretty(0),
+        json    => JSON->new->utf8(0)->pretty(0),
     }, $class;
 }
 
@@ -29,13 +29,7 @@ sub start($self) {
 }
 
 sub next($self, $data) {
-    if ($self->{first}) {
-        $self->{first} = 0;
-    } else {
-        print ",";
-    }
-
-    print $self->json->encode($data), "\n";
+    print $self->json->encode($data), ",\n";
 }
 
 sub DESTROY($self) {

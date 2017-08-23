@@ -31,6 +31,7 @@ sub new($class, $config) {
     $self->validate;
     $self->init_logger;
     $self->init_modules;
+    $self->init_events;
     return $self;
 }
 
@@ -39,8 +40,11 @@ sub cfg($self)      { $self->{config}; }
 sub log($self)      { $self->{logger}; }
 sub cache($self)    { $self->{cache};  }
 
-sub mod($self, $name = undef) {
-    return $self->{mods} if !defined $name;
+sub mods($self) {
+    return $self->{mods};
+}
+
+sub mod($self, $name) {
     return $self->{mods_by_name}->{$name};
 }
 
@@ -52,6 +56,32 @@ sub validate($self) {
         unless $self->cfg->{timeouts} > 0;
     croak "failures is not greater than zero"
         unless $self->cfg->{failures} > 0;
+}
+
+# replace utf8 hardcoded string
+sub u8($self, $what) {
+    my $t = join("", map { chr(hex) } ($what =~ m/../g));
+    utf8::decode($t);
+    return $t;
+}
+
+# timer manipulation
+sub get_or_set_timer($self, $key, $timer, $ticks) {
+    my $timers = $self->mod($key)->{tmrs};
+
+    # nothing to do if no timer set and ticks is undefined
+    return if !defined $timers->{$timer} && !defined $ticks;
+
+    # create timer if there is none
+    $timers->{$timer} = Breeze::Counter->new(current => $ticks)
+        if !defined $timers->{$timer};
+
+    # return a reference to the timer
+    return \$timers->{$timer};
+}
+
+sub delete_timer($self, $key, $timer) {
+    delete $self->mod($key)->{tmrs}->{$timer};
 }
 
 # initializers
@@ -162,10 +192,26 @@ sub init_modules($self) {
         }
     }
 }
-sub run($self) {
-    my $ret;
 
-    foreach my $entry ($self->mod->@*) {
+sub init_events($self) {
+    $self->{event_map} = [
+        # 0     - unknown
+        undef,
+        # 1 2 3 - clicks
+        qw(left_click   middle_click    right_click),
+        # 4 5   - wheel
+        qw(wheel_up     wheel_down),
+        # 6 7   - ?
+        undef, undef,
+        # 8 9   - mouse side buttons
+        qw(back next)
+    ];
+}
+
+sub run($self) {
+    my $ret = [];
+
+    foreach my $entry ($self->mods->@*) {
         # separators will be handled in postprocessing
         if (exists $entry->{separator}) {
             push @$ret, { %$entry };
@@ -195,7 +241,7 @@ sub run($self) {
                 $data = $self->fail_module($entry);
             }
         } else {
-            # ignore cached 'blink' and 'invert'
+            # ignore cached 'blink', 'invert', 'reset_blink' and 'reset_invert'
             delete $data->@{qw(blink invert cache)};
         }
 
@@ -215,12 +261,6 @@ sub run($self) {
     $self->post_process($ret);
 
     return $ret;
-}
-
-sub u8($self, $what) {
-    my $t = join("", map { chr(hex) } ($what =~ m/../g));
-    utf8::decode($t);
-    return $t;
 }
 
 sub post_process_seg($self, $ret) {
@@ -243,35 +283,20 @@ sub post_process_seg($self, $ret) {
 
         # combine text, icon into full_text
         if (defined $data->{text} && defined $data->{icon}) {
-            $data->{full_text} = "$data->{icon} $data->{text}";
-        } elsif (defined $data->{text}) {
-            $data->{full_text} = $data->{text};
+            $data->{full_text} = join " ", $data->{icon}, $data->{text};
+        } elsif (defined $data->{text} || defined $data->{icon}) {
+            $data->{full_text} = join "", ($data->{icon} // ""), ($data->{text} // "");
         }
     }
-}
-
-sub get_or_set_timer($self, $key, $timer, $ticks) {
-    my $timers = $self->mod($key)->{tmrs};
-
-    # nothing to do if no timer set and ticks is undefined
-    return if !defined $timers->{$timer} && !defined $ticks;
-
-    # create timer if there is none
-    $timers->{$timer} = Breeze::Counter->new(current => $ticks)
-        if !defined $timers->{$timer};
-
-    # return a reference to the timer
-    return \$timers->{$timer};
-}
-
-sub delete_timer($self, $key, $timer) {
-    delete $self->mod($key)->{tmrs}->{$timer};
 }
 
 sub post_process_inversion($self, $ret) {
     foreach my $seg (@$ret) {
         # separators are not supposed to blink
         next if exists $seg->{separator};
+
+        $self->delete_time($seg->{entry}, "invert")
+            if $seg->{reset_invert} || $seg->{reset_all};
 
         my $timer = $self->get_or_set_timer($seg->{entry}, "invert", $seg->{invert});
         next if !defined $timer;
@@ -291,6 +316,9 @@ sub post_process_blinking($self, $ret) {
     foreach my $seg (@$ret) {
         # separators are not supposed to blink
         next if exists $seg->{separator};
+
+        $self->delete_time($seg->{entry}, "blink")
+            if $seg->{reset_blink} || $seg->{reset_all};
 
         my $timer = $self->get_or_set_timer($seg->{entry}, "blink", $seg->{blink});
         next if !defined $timer;
@@ -397,7 +425,66 @@ sub post_process($self, $ret) {
 
     # cleanup tags
     foreach my $seg (@$ret) {
-        delete $seg->@{qw(separator text icon blink invert)};
+        delete $seg->@{qw(separator text icon blink invert reset_blink reset_invert)};
+    }
+}
+
+# event processing
+
+sub event_button($self, $code) {
+    return $self->{event_map}->[$code];
+}
+
+sub process_event($self, $mod, $data) {
+    my $entry = $mod->{conf}->{-name};
+
+    # module might want to redraw after event
+    $self->cache->flush($entry)
+        if $data->{flush};
+
+    # stop timers
+    $self->delete_timer($entry, "blink")
+        if $data->{reset_blink}  || $data->{reset_all};
+
+    $self->delete_timer($entry, "invert")
+        if $data->{reset_invert} || $data->{reset_all};
+
+    # reset timers on demand
+    $self->get_or_set_timer($entry, "blink", $data->{blink})
+        if defined $data->{blink};
+
+    $self->get_or_set_timer($entry, "invert", $data->{invert})
+        if defined $data->{invert};
+}
+
+sub event($self, $event) {
+    use Data::Dumper;
+
+    my $target = $event->{instance};
+    my $mod    = $self->mod($target);
+
+    if (!defined $mod) {
+        $self->log->error("got event for unknown module '$event->{entry}'");
+        return;
+    }
+
+    my $button = $self->event_button($event->{button});
+    my $data = try {
+        if (!defined $button) {
+            $self->log->error("got unknown event '$event->{button}' for '$event->{entry}'");
+            return $mod->{mod}->on_event;
+        } else {
+            my $method = "on_$button";
+            return $mod->{mod}->$method;
+        }
+    } catch {
+        chomp $_;
+        $self->log->error("event handler failed");
+        $self->log->error($_);
+    };
+
+    if (defined $data) {
+        $self->process_event($mod, $data);
     }
 }
 

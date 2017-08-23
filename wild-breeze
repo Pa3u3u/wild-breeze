@@ -7,18 +7,23 @@ use warnings;
 
 use FindBin     qw($Bin);
 use lib         "$Bin";
+use open        ":std", ":encoding(utf-8)";
 
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
+
+use PerlIO;
+use Data::Dumper;
+
 use Breeze::Core;
 use Breeze::I3;
 use Carp;
-use Data::Dumper;
 use File::Slurp;
 use Getopt::Long    qw(:config bundling);
 use JSON::XS;
 use Pod::Usage;
+use IO::Handle;
 use IO::Select;
 use Try::Tiny;
 use YAML::Syck;
@@ -46,8 +51,7 @@ sub read_config($filename) {
 # Entry
 #-------------------------------------------------------------------------------
 
-# set encoding on all input and output streams, decode ARGV
-binmode $_, ":encoding(utf-8)" foreach (*STDIN, *STDOUT, *STDERR);
+# decode ARGV to utf8
 utf8::decode($_) foreach @ARGV;
 
 # initialize and process optionss
@@ -84,7 +88,8 @@ my $select = IO::Select->new(*STDIN)
 #-------------------------------------------------------------------------------
 
 # turn off buffering
-$| = 1;
+STDOUT->autoflush(1);
+STDERR->autoflush(1);
 
 # let's roll
 $i3->start;
@@ -128,7 +133,7 @@ while (1) {
         # remove separators and process events
         $ev_parser->incr_text =~ s/^\s*,//;
         while (my $event = $ev_parser->incr_parse) {
-            $log->error("event processing is not yet implemented");
+            $breeze->event($event);
             $ev_parser->incr_text =~ s/^\s*,//;
         }
     }
