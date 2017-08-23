@@ -134,7 +134,7 @@ sub init_modules($self) {
             # check that only known keys begin with '-'
             foreach my $key (grep { $_ =~ m/^-/ } (keys $modcfg->%*)) {
                 $self->log->warn("unknown '$key' in module description")
-                    unless $key =~ m/^-(name|refresh|driver)$/;
+                    unless $key =~ m/^-(name|refresh|driver|timeout)$/;
             }
 
             my ($moddrv, $modname) = $modcfg->@{qw(-driver -name)};
@@ -178,6 +178,14 @@ sub init_modules($self) {
             }
 
             my %counterconf = (from => 0, step => 1, cycle => 0);
+
+            # if module uses custom timeout, notify log
+            if (defined $modcfg->{-timeout} && $modcfg->{-timeout} >= 1) {
+                $self->log->info("$modname has custom timeout '$modcfg->{-timeout}'");
+            } elsif (defined $modcfg->{-timeout}) {
+                $self->log->info("refusing to use timeout '$modcfg->{-timeout}' as it is invalid");
+                delete $modcfg->{-timeout};
+            }
 
             # got here so far, save all
             my $entry = {
@@ -256,7 +264,8 @@ sub run($self) {
 
         if (!defined $data) {
             $data = try {
-                my $tmp = timeout($self->cfg->{timeout} => sub {
+                my $to  = $entry->{conf}->{-timeout} // $self->cfg->{timeout};
+                my $tmp = timeout($to => sub {
                     return $entry->{mod}->invoke;
                 });
 
@@ -506,7 +515,8 @@ sub event($self, $event) {
             $self->cache->flush($target);
         }
 
-        my $tmp = timeout($self->cfg->{timeout} => sub {
+        my $to  = $mod->{conf}->{-timeout} // $self->cfg->{timeout};
+        my $tmp = timeout($to => sub {
             if (!defined $button) {
                 $self->log->error("got unknown event '$event->{button}' for '$target'");
                 return $mod->{mod}->on_event;
