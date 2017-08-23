@@ -9,6 +9,7 @@ use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
 use Carp;
+use IO::Handle;
 use Time::Format    qw(%strftime);
 
 sub new($class, @args) {
@@ -20,6 +21,7 @@ sub new($class, @args) {
     open $self->{fh}, ">:encoding(utf-8)", $self->{filename}
         or croak "$self->{filename}: $!";
 
+    $self->{fh}->autoflush(1);
     $self->info("logging started");
     return $self;
 }
@@ -43,5 +45,7 @@ sub debug($self, @msg) {
     printf { $self->{fh} } "%s debg[%s] %s\n",
         $self->time, $self->{category}, join("", @msg);
 }
+
+# vim: syntax=perl5-24
 
 1;

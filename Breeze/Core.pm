@@ -17,6 +17,7 @@ use Carp;
 use Data::Dumper;
 use JSON::XS;
 use Module::Load;
+use Time::HiRes;
 use Time::Out   qw(timeout);
 use Try::Tiny;
 
@@ -32,6 +33,9 @@ sub new($class, $config) {
     $self->init_logger;
     $self->init_modules;
     $self->init_events;
+
+    $self->cache->set_logger($self->log->clone(category => "Breeze::Cache"));
+
     return $self;
 }
 
@@ -56,6 +60,8 @@ sub validate($self) {
         unless $self->cfg->{timeouts} > 0;
     croak "failures is not greater than zero"
         unless $self->cfg->{failures} > 0;
+    croak "cooldown is not greater than zero"
+        unless $self->cfg->{cooldown} > 0;
 }
 
 # replace utf8 hardcoded string
@@ -81,6 +87,7 @@ sub get_or_set_timer($self, $key, $timer, $ticks) {
 }
 
 sub delete_timer($self, $key, $timer) {
+    $self->log->info("removing timer '$timer' for key '$key'");
     delete $self->mod($key)->{tmrs}->{$timer};
 }
 
@@ -175,6 +182,7 @@ sub init_modules($self) {
             my $entry = {
                 conf => $modcfg,
                 mod  => $module,
+                log  => $modlog,
                 tmrs => {
                     timeout => Breeze::Counter->new(%counterconf,
                         current => $self->cfg->{timeouts},
@@ -208,6 +216,30 @@ sub init_events($self) {
     ];
 }
 
+sub fail_module($self, $entry, $timer) {
+    my $tmr = \$entry->{tmrs}->{$timer};
+
+    if (!($$tmr--)->current) {
+        $self->log->error("module depleted timer '$timer' for the last time, disabling");
+        $entry->{mod} = WBM::Fail->new(
+            -entry => $entry->{conf}->{-name},
+            -log   => $entry->{log},
+            text   => "$entry->{conf}->{-name}($entry->{conf}->{-driver})",
+        );
+        return $entry->{mod}->invoke;
+    } else {
+        # temporarily disable module
+        return {
+            text    => "$entry->{conf}->{-name}($entry->{conf}->{-driver})",
+            blink   => $self->cfg->{cooldown},
+            cache   => $self->cfg->{cooldown},
+            background  => "b58900",
+            color       => "002b36",
+            icon        => ($timer eq "fail" ? "" : ""),
+        };
+    }
+}
+
 sub run($self) {
     my $ret = [];
 
@@ -235,14 +267,14 @@ sub run($self) {
 
             # module timeouted?
             if ($@) {
-                $data = $self->timeout_module($entry);
+                $data = $self->fail_module($entry, "timeout");
             # module failed?
             } elsif (!defined $data) {
-                $data = $self->fail_module($entry);
+                $data = $self->fail_module($entry, "fail");
             }
         } else {
             # ignore cached 'blink', 'invert', 'reset_blink' and 'reset_invert'
-            delete $data->@{qw(blink invert cache)};
+            delete $data->@{qw(blink invert cache reset_blink reset_invert reset_all)};
         }
 
         # set entry and instance
@@ -295,7 +327,7 @@ sub post_process_inversion($self, $ret) {
         # separators are not supposed to blink
         next if exists $seg->{separator};
 
-        $self->delete_time($seg->{entry}, "invert")
+        $self->delete_timer($seg->{entry}, "invert")
             if $seg->{reset_invert} || $seg->{reset_all};
 
         my $timer = $self->get_or_set_timer($seg->{entry}, "invert", $seg->{invert});
@@ -317,7 +349,7 @@ sub post_process_blinking($self, $ret) {
         # separators are not supposed to blink
         next if exists $seg->{separator};
 
-        $self->delete_time($seg->{entry}, "blink")
+        $self->delete_timer($seg->{entry}, "blink")
             if $seg->{reset_blink} || $seg->{reset_all};
 
         my $timer = $self->get_or_set_timer($seg->{entry}, "blink", $seg->{blink});
@@ -470,6 +502,10 @@ sub event($self, $event) {
 
     my $button = $self->event_button($event->{button});
     my $data = try {
+        if ($mod->{mod}->refresh_on_event) {
+            $self->cache->flush($mod->{conf}->{-name});
+        }
+
         if (!defined $button) {
             $self->log->error("got unknown event '$event->{button}' for '$event->{entry}'");
             return $mod->{mod}->on_event;
@@ -483,8 +519,10 @@ sub event($self, $event) {
         $self->log->error($_);
     };
 
-    if (defined $data) {
+    if (defined $data and ref $data eq "HASH") {
         $self->process_event($mod, $data);
+    } elsif (defined $data) {
+        $self->log->debug("event returned ref '", ref($data), "', ignoring");
     }
 }
 

@@ -21,11 +21,9 @@ sub new($class, %args) {
 }
 
 sub refresh_on_event($self) { 1; }
-sub on_left_click($self)    { $self->{dismissed} = 1; }
-sub on_middle_click($self)  { $self->{dismissed} = 1; }
-sub on_right_click($self)   { $self->{dismissed} = 1; }
 
 sub invoke($self) {
+    $self->log->info("invoked");
     my $ret = {
         text    => $self->{text},
         icon    => "",
@@ -34,12 +32,11 @@ sub invoke($self) {
     };
 
     if ($self->{first}) {
-        $ret->{blink}       = 6;
-        $self->{first}      = 0;
-    }
-
-    if (!$self->{dismissed}) {
+        $ret->{blink}       = 30;
         $ret->{invert}      = "+inf";
+        $self->{first}      = 0;
+    } else {
+        $ret->{reset_all} = 1;
     }
 
     return $ret;
