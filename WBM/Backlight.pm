@@ -49,7 +49,7 @@ sub on_wheel_up($) {
 }
 
 sub on_wheel_down($) {
-    system(qw(xbacklight -dec 5% -time 50 -steps 5);
+    system(qw(xbacklight -dec 5% -time 50 -steps 5));
     return { reset_all => 1, invert => 1 };
 }
 
