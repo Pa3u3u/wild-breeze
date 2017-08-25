@@ -19,8 +19,8 @@ sub new($class,%args) {
 
     $self->{stopped}    = 0;
     $self->{refresh}    = $args{-refresh};
-    $self->{unit}       = $args{unit}   // "MB";
-    $self->{prec}       = $args{prec}    // "%4d";
+    $self->{unit}       = $args{unit}       // "MB";
+    $self->{precision}  = $args{precision}  // "%4d";
     $self->{display}    = $args{display} // [
         {
             icon    => "",
@@ -81,7 +81,9 @@ sub populate_percent($self, $data) {
 
     foreach my $rec (@$cookbook) {
         my ($a, $b, $c) = @$rec;
-        $data->{$a . $b . "Percent"} = int((100 * $data->{$a . $b}) / $data->{$a . $c});
+        $data->{$a . $b . "Percent"} = $data->{$a . $c}
+            ? int((100 * $data->{$a . $b}) / $data->{$a . $c})
+            : "0";
     }
 }
 
@@ -106,6 +108,8 @@ sub invoke($self) {
             if (defined($data{$var . "Unit"}) && ($data{$var . "Unit"} ne $self->{unit})) {
                 $val = int($val * $self->u($data{$var . "Unit"}) / $self->u($self->{unit}));
             }
+
+            $val = sprintf($var =~ m/Percent$/ ? "%3d" : $self->{precision}, $val);
         }
 
         $str =~ s/%\{$var\}/$val/g;
