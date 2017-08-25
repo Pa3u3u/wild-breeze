@@ -57,25 +57,54 @@ padding: 1
 
 # Default values for output entry.
 defaults:
-    background: 002b36
-    color:      93a1a1
-    border:     null
+    background:     $002b36
+    color:          $93a1a1
+    border:         null
 #   the following two will be _always_ set up by wind-breeze.
 #   separator:              no
 #   separator_block_width:  0
+
+# If defined, uses this color instead of default background in alternating
+# fashion.
+#
+# Values: colors or null
+alternate:          $083a47
 
 # Module descriptions. The following modules will be displayed from left
 # to right as they appear in this array of objects.
 modules:
     # leading separator
     - separator
-    - -name:        test
-      -driver:      WBM::Test
+    - -name:        spotify
+      -driver:      WBM::Spotify
+      -timeout:     1
+    - separator
+    - -name:        cpu
+      -driver:      WBM::ArchCPU
+      -refresh:     1
+      warning:      85
+    - separator
+    - -name:        memory
+      -driver:      WBM::MemInfo
+      -refresh:     5
+      warning:      80
+      critical:     90
+      unit:         MB
+      switch:       4
+      display:
+          - icon:   
+            format: "%{MemUsed}/%{MemTotal} %{Unit} (%{MemUsedPercent}%)"
+            watch:  "MemUsedPercent"
+            more:   worse
+          - icon:   
+            format: "%{SwapUsed}/%{SwapTotal} %{Unit} (%{SwapUsedPercent}%)"
+            watch:  "SwapUsedPercent"
+            more:   worse
     - separator
     - -name:        volume
       -driver:      WBM::PAMixer
       -refresh:     0
-      sink:         alsa_output.pci-0000_00_1f.3.analog-stereo
+      sink:         alsa_output.pci-0000_00_1b.0.analog-stereo
       allow-boost:  yes
       step:         2
     - separator
