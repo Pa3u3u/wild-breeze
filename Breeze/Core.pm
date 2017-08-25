@@ -298,8 +298,8 @@ sub run($self) {
                 if ($@) {
                     $self->log->error("module '$entry->{conf}->{-name}' timeouted");
                     return $self->fail_module($entry, "timeout");
-                } elsif (!defined $tmp) {
-                    $self->log->fatal("module '$entry->{conf}->{-name}' returned undef");
+                } elsif (!defined $tmp || ref $tmp ne "HASH") {
+                    $self->log->fatal("module '$entry->{conf}->{-name}' returned ", (ref($tmp) || "undef"));
                 }
 
                 return $tmp;
