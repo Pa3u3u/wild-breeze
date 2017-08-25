@@ -43,8 +43,9 @@ sub compute_usage($self, %data) {
 
 sub new($class, %args) {
     my $self = $class->SUPER::new(%args);
-    $self->{cpus}    = $self->processors;
-    $self->{warning} = $args{warning} // "+inf";
+    $self->{cpus}     = $self->processors;
+    $self->{warning}  = $args{warning}  // "+inf";
+    $self->{critical} = $args{critical} // "+inf";
 
     $self->{step} = Breeze::Counter->new(
         from    => -1,
@@ -88,6 +89,7 @@ sub invoke($self) {
     };
 
     $ret->{invert} = 0 if $util >= $self->{warning};
+    $ret->{blink}  = 0 if $util >= $self->{critical};
     return $ret;
 }
 

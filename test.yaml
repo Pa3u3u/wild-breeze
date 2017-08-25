@@ -82,7 +82,8 @@ modules:
     - -name:        cpu
       -driver:      WBM::ArchCPU
       -refresh:     1
-      warning:      85
+      warning:      80
+      critical:     90
     - separator
     - -name:        memory
       -driver:      WBM::MemInfo
@@ -91,6 +92,7 @@ modules:
       critical:     90
       unit:         MB
       switch:       4
+      valfmt:       %4d
       display:
           - icon:   
             format: "%{MemUsed}/%{MemTotal} %{Unit} (%{MemUsedPercent}%)"
