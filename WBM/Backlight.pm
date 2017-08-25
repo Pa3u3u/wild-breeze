@@ -4,7 +4,7 @@ use utf8;
 use strict;
 use warnings;
 
-use parent "WBM::Driver";
+use parent      "WBM::Driver";
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
@@ -44,20 +44,20 @@ sub invoke($self) {
 }
 
 sub on_wheel_up($) {
-    qx(xbacklight -inc 5% -time 50 -steps 5);
+    system(qw(xbacklight -inc 5% -time 50 -steps 5));
     return { reset_all => 1, invert => 1 };
 }
 
 sub on_wheel_down($) {
-    qx(xbacklight -dec 5% -time 50 -steps 5);
+    system(qw(xbacklight -dec 5% -time 50 -steps 5);
     return { reset_all => 1, invert => 1 };
 }
 
 sub on_middle_click($) {
     if ($_[0]->{last} < 10) {
-        qx(xbacklight -set 40% -time 400 -steps 30);
+        system(qw(xbacklight -set 40% -time 400 -steps 30));
     } else {
-        qx(xbacklight -set  0% -time 400 -steps 30);
+        system(qw(xbacklight -set  0% -time 400 -steps 30));
     }
 
     return { reset_all => 1, blink => 4 };
