@@ -99,8 +99,9 @@ sub invoke($self) {
         if (lc $var eq "unit") {
             $val = $self->{unit};
         } else {
-            $val = $data{$var}
-                or $self->log->fatal("no such key '$var'");
+            $self->log->fatal("no such key '$var'")
+                if !defined $data{$var};
+            $val = $data{$var};
 
             if (defined($data{$var . "Unit"}) && ($data{$var . "Unit"} ne $self->{unit})) {
                 $val = int($val * $self->u($data{$var . "Unit"}) / $self->u($self->{unit}));
@@ -124,11 +125,11 @@ sub invoke($self) {
     };
 
     if ($fmt->{more} eq "worse") {
-        $ret->{blink}   = "+inf" if $watch > $self->{critical};
-        $ret->{invert}  = "+inf" if $watch > $self->{warning};
+        $ret->{blink}   = "+inf" if $watch >= $self->{critical};
+        $ret->{invert}  = "+inf" if $watch >= $self->{warning};
     } else {
-        $ret->{blink}   = "+inf" if $watch < (100 - $self->{critical});
-        $ret->{invert}  = "+inf" if $watch < (100 - $self->{warning});
+        $ret->{blink}   = "+inf" if $watch <= (100 - $self->{critical});
+        $ret->{invert}  = "+inf" if $watch <= (100 - $self->{warning});
     }
 
     if (!$self->{stopped} && defined $self->{switch} && int(--$self->{switch}) == 0) {
