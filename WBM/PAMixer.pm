@@ -5,7 +5,7 @@ use utf8;
 use strict;
 use warnings;
 
-use parent      qw(WBM::Driver);
+use parent      qw(WBM::Command);
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
@@ -45,56 +45,8 @@ sub new($class, %args) {
     return $self;
 }
 
-sub run3opt($self) {
-    return {
-        binmode_stdout => ":encoding(utf-8)",
-        binmode_stderr => ":encoding(utf-8)",
-        return_if_system_error => 1,
-    };
-}
-
-sub run_command($self, @cmd) {
-    my ($stdout, $stderr) = ("","");
-
-    if (!run3(\@cmd, \undef, \$stdout, \$stderr, $self->run3opt) || $?) {
-        # some fucked up commands, like pamixer, output \n\n after the command.
-        $stdout =~ s/(^\s*|\s*$)//g;
-        $stderr =~ s/(^\s*|\s*$)//g;
-        #$self->log->info("when running '", join(" ", @cmd), "'");
-
-        if ($? == -1) {
-            $self->log->error("system command failed: errno=$!");
-            $self->log->fatal("this is a fatal error");
-        } elsif ($? & 127) {
-            $self->log->error("command died on signal: signo=$?, ",
-                "stdout='$stdout', stderr='$stderr'");
-            $self->log->fatal("this is a fatal error");
-        } elsif ($? >> 8) {
-        #   $self->log->error("command failed: status=", ($? >> 8), ", ",
-        #       "stdout='$stdout', stderr='$stderr'");
-        }
-    }
-
-    my $status = $?;
-    # IPC::Run3 does not restore encoding layers
-    # https://rt.cpan.org/Public/Bug/Display.html?id=69011
-    binmode STDIN;  binmode STDIN,  ":encoding(utf-8)";
-    binmode STDOUT; binmode STDOUT, ":encoding(utf-8)";
-    binmode STDERR; binmode STDOUT, ":encoding(utf-8)";
-
-    $stdout =~ s/(^\s*|\s*$)//g;
-    $stderr =~ s/(^\s*|\s*$)//g;
-
-    if ($stderr ne "") {
-        $self->log->info("while running '", join(" ", @cmd), "'");
-        $self->log->error("stderr='$stderr'");
-    }
-
-    return ($stdout, $stderr, $status);
-}
-
 sub run_pamixer($self, @args) {
-    $self->run_command("pamixer", "--sink", $self->{sink}, @args);
+    return $self->run_command(["pamixer", "--sink", $self->{sink}, @args]);
 }
 
 sub refresh_on_event($) { 1; }
