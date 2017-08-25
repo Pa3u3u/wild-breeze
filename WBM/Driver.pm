@@ -8,8 +8,6 @@ use warnings;
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
-use Data::Dumper;
-
 sub new($class, %args) {
     my $self = bless {}, $class;
     ($self->{log}) = delete $args{-log};

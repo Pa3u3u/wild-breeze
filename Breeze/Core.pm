@@ -26,6 +26,7 @@ sub new($class, $config) {
     my $self = {
         config  => $config,
         cache   => Breeze::Cache->new,
+        ticks   => Breeze::Counter->new,
     };
 
     bless $self, $class;
@@ -44,6 +45,7 @@ sub new($class, $config) {
 sub cfg($self)      { $self->{config}; }
 sub log($self)      { $self->{logger}; }
 sub cache($self)    { $self->{cache};  }
+sub ticks($self)    { \$self->{ticks};  }
 
 sub mods($self) {
     return $self->{mods};
@@ -80,15 +82,22 @@ sub get_or_set_timer($self, $key, $timer, $ticks) {
     return if !defined $timers->{$timer} && !defined $ticks;
 
     # create timer if there is none
-    $timers->{$timer} = Breeze::Counter->new(current => $ticks)
-        if !defined $timers->{$timer};
+    if (!defined $timers->{$timer}) {
+        # optimization: do not store counter for only one cycle,
+        # use local variable instead
+        if ($ticks == 1) {
+            my $temp = 1;
+            return \$temp;
+        }
+
+        $timers->{$timer} = Breeze::Counter->new(current => $ticks);
+    }
 
     # return a reference to the timer
     return \$timers->{$timer};
 }
 
 sub delete_timer($self, $key, $timer) {
-    $self->log->info("removing timer '$timer' for key '$key'");
     delete $self->mod($key)->{tmrs}->{$timer};
 }
 
@@ -150,7 +159,8 @@ sub init_modules($self) {
                 # do not begin with '-'
                 my @keys = grep { $_ !~ m/^-/ } (keys $modcfg->%*);
                 my %args = $modcfg->%{-name, @keys};
-                $args{-log} = $modlog;
+                $args{-log}     = $modlog;
+                $args{-refresh} = $modcfg->{-refresh} // 0;
 
                 # create instance
                 return $moddrv->new(%args);
@@ -228,7 +238,7 @@ sub init_events($self) {
 sub fail_module($self, $entry, $timer) {
     my $tmr = \$entry->{tmrs}->{$timer};
 
-    if (!($$tmr--)->current) {
+    if (!($$tmr--)) {
         $self->log->error("module depleted timer '$timer' for the last time, disabling");
         $entry->{mod} = WBM::Fail->new(
             -entry => $entry->{conf}->{-name},
@@ -272,6 +282,8 @@ sub run($self) {
                 if ($@) {
                     $self->log->error("module '$entry->{conf}->{-name}' timeouted");
                     return $self->fail_module($entry, "timeout");
+                } elsif (!defined $tmp) {
+                    $self->log->fatal("module '$entry->{conf}->{-name}' returned undef");
                 }
 
                 return $tmp;
@@ -301,18 +313,26 @@ sub run($self) {
     # run post-processing
     $self->post_process($ret);
 
+    ++$self->ticks->$*;
     return $ret;
 }
 
 sub post_process_seg($self, $ret) {
+    my $alt = 0;
     foreach my $data (@$ret) {
         # skip separators
         next if exists $data->{separator};
 
         # add defaults
         while (my ($k, $v) = each $self->cfg->{defaults}->%*) {
-            $data->{$k} = $v if !exists $data->{$k} && defined $v;
+            next if exists $data->{$k} || !defined $v;
+
+            $data->{$k} = ($k eq "background" && ($alt % 2 == 1) && defined $self->cfg->{alternate})
+                        ? $self->cfg->{alternate}
+                        : $v;
         }
+
+        ++$alt;
 
         # copy colors if required
         foreach my $k (qw(color background border)) {
@@ -342,14 +362,14 @@ sub post_process_inversion($self, $ret) {
         my $timer = $self->get_or_set_timer($seg->{entry}, "invert", $seg->{invert});
         next if !defined $timer;
 
-        # advance timer
-        my $tick  = (--$$timer)->current;
+        # advance timer, use global if evaluates to inf
+        my $tick = int((--$$timer) == "+inf" ? $self->ticks->$* : $$timer);
 
-        # use xor to invert blinking if 'invert' flag is already set
+        # set inversion
         $seg->{invert} = 1 if $tick >= 0;
 
         # remove timer if expired
-        $self->delete_timer($seg->{entry}, "invert") unless $tick;
+        $self->delete_timer($seg->{entry}, "invert") unless $$timer;
     }
 }
 
@@ -364,14 +384,14 @@ sub post_process_blinking($self, $ret) {
         my $timer = $self->get_or_set_timer($seg->{entry}, "blink", $seg->{blink});
         next if !defined $timer;
 
-        # advance timer
-        my $tick = (--$$timer)->current;
+        # advance timer, use global if evaluates to inf
+        my $tick = int((--$$timer) == "+inf" ? $self->ticks->$* : $$timer);
 
         # use xor to invert blinking if 'invert' flag is already set
         $seg->{invert} = ($seg->{invert} xor ($tick % 2 == 0));
 
         # remove timer if expired
-        $self->delete_timer($seg->{entry}, "blink") unless $tick;
+        $self->delete_timer($seg->{entry}, "blink") unless $$timer;
     }
 }
 

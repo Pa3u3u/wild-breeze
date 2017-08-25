@@ -20,8 +20,11 @@ sub new($class, %args) {
 
     $self->{sink} = $args{sink};
 
-    if (defined $self->run_pamixer()) {
+    my (undef, $stderr, $status) = $self->run_pamixer;
+    if ($status == 0) {
         $self->log->info("sink found");
+    } else {
+        $self->log->fatal("pamixer error: $stderr");
     }
 
     if ($self->{sink} =~ m/^\d+$/) {
@@ -106,7 +109,6 @@ sub invoke($self) {
     if ($muted) {
         $ret->@{qw(color background)} = qw(002b36 93a1a1);
     } else {
-        $ret->{background} = "073642";
         $ret->{color}      = $volume > 100 ? "238bd2"
                            : Breeze::Grad::get($volume, qw(dc322f b58900 859900));
 
@@ -127,7 +129,7 @@ sub invoke($self) {
 
 sub on_left_click($self) {
     $self->run_pamixer("--toggle-mute");
-    return { reset_all => 1, reset_invert => 1, blink => 4 };
+    return { reset_all => 1 };
 }
 
 sub on_middle_click($self) {

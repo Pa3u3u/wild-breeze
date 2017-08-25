@@ -16,7 +16,9 @@ use overload
     "="     => \&op_assign,
     "bool"  => \&op_bool,
     '""'    => \&op_scalar,
-    "0+"    => \&op_scalar;
+    "0+"    => \&op_scalar,
+    "int"   => \&op_scalar,
+    "<=>"   => \&op_cmp;
 
 sub from($self)     { $self->{from};    }
 sub to($self)       { $self->{to};      }
@@ -115,6 +117,12 @@ sub op_meq($self, $o, $swap) {
 
 sub op_assign($self, $, $) {
     return $self->clone;
+}
+
+sub op_cmp($self, $o, $swp) {
+    my $a = $self->current;
+    my $b = ref $o eq __PACKAGE__ ? $o->current : $o;
+    return $swp ? $b - $a : $a - $b;
 }
 
 # vim: syntax=perl5-24

@@ -23,7 +23,6 @@ sub new($class, %args) {
 sub refresh_on_event($self) { 1; }
 
 sub invoke($self) {
-    $self->log->info("invoked");
     my $ret = {
         text    => $self->{text},
         icon    => "",
