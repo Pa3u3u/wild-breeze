@@ -91,8 +91,8 @@ sub get_or_set_timer($self, $key, $timer, $ticks) {
     if (!defined $timers->{$timer}) {
         # optimization: do not store counter for only one cycle,
         # use local variable instead
-        if ($ticks <= 1) {
-            my $temp = $ticks;
+        if ($ticks == 0) {
+            my $temp = 0;
             return \$temp;
         }
 
@@ -377,14 +377,14 @@ sub post_process_inversion($self, $ret) {
         next if !defined $timer;
 
         # advance timer, use global if evaluates to inf
-        my $tick = int((--$$timer) == "+inf" || ref $timer eq "SCALAR"
+        my $tick = int($$timer == "+inf" || ref $timer eq "SCALAR"
             ? $self->ticks->$* : $$timer);
 
         # set inversion
         $seg->{invert} = 1 if $tick >= 0;
 
         # remove timer if expired
-        $self->delete_timer($seg->{entry}, "invert") unless $$timer;
+        $self->delete_timer($seg->{entry}, "invert") unless $$timer--;
     }
 }
 
@@ -400,14 +400,14 @@ sub post_process_blinking($self, $ret) {
         next if !defined $timer;
 
         # advance timer, use global if evaluates to inf
-        my $tick = int((--$$timer) == "+inf" || ref $timer eq "SCALAR"
+        my $tick = int($$timer == "+inf" || ref $timer eq "SCALAR"
             ? $self->ticks->$* : $$timer);
 
         # use xor to invert blinking if 'invert' flag is already set
         $seg->{invert} = ($seg->{invert} xor ($tick % 2 == 0));
 
         # remove timer if expired
-        $self->delete_timer($seg->{entry}, "blink") unless $$timer;
+        $self->delete_timer($seg->{entry}, "blink") unless $$timer--;
     }
 }
 
