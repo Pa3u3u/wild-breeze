@@ -1,0 +1,25 @@
+black:      $2e3436
+gray:       $555753
+silver:     $babdb6
+white:      $eeeeec
+
+red:        $ef2929
+green:      $8ae234
+blue:       $3465a4
+magenta:    $ad7fa8
+yellow:     $edd400
+cyan:       $729fcf
+
+orange:     $f57900
+violet:     $5c3566
+purple:     $5c3566
+
+# specials
+bg1:        black
+bg2:        gray
+aluminum:   888a85
+
+spotify.playing:   green
+backlight.@grad:
+    aluminum
+    white
