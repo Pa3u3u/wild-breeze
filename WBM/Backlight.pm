@@ -27,7 +27,7 @@ sub invoke($self) {
     chomp($max,$cur);
 
     my $p = int ((100 * $cur) / $max);
-    my $c = Breeze::Grad::get($p, qw(dc322f b58900 859900));
+    my $c = $self->theme->grad($p, '%{backlight.@grad,gray white}');
 
     my $ret = {
         icon      => "",

@@ -97,7 +97,7 @@ sub invoke {
         return {
             icon    => "",
             text    => undef,
-            color   => '657b83',
+            color   => '%{spotify.offline,silver}',
         };
     }
 
@@ -122,11 +122,11 @@ sub invoke {
     }
 
     my %cm = (
-        Stopped     => 'dc322f',
-        Paused      => 'b58900',
-        Playing     => '268bd2',
-        PlayingAd   => 'd33682',
-        Error       => 'dc322f',
+        Stopped     => '%{spotify.stopped,red}',
+        Paused      => '%{spotify.paused,orange,yellow}',
+        Playing     => '%{spotify.playing,cyan}',
+        PlayingAd   => '%{spotify.playing.ad,magenta}',
+        Error       => '%{spotify.error,red}',
     );
 
     my $c = $cm{$self->{evstat} // $data->{status}};

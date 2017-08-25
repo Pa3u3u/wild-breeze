@@ -26,7 +26,7 @@ sub invoke($self) {
     my $ret = {
         text    => $self->{text},
         icon    => "",
-        color   => "dc322f",
+        color   => "%{fail.color,red}",
         cache   => "+inf",
     };
 

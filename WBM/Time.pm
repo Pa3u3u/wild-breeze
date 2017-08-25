@@ -30,6 +30,7 @@ sub invoke($self) {
     return {
         text    => $strftime{$self->{format}, localtime},
         icon    => $self->{icon},
+        color   => "%{time.color}",
     };
 }
 

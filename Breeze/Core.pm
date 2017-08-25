@@ -13,6 +13,7 @@ use Breeze::Counter;
 use Breeze::Logger;
 use Breeze::Logger::File;
 use Breeze::Logger::StdErr;
+use Breeze::Theme;
 use Carp;
 use Data::Dumper;
 use JSON::XS;
@@ -22,7 +23,7 @@ use Time::Out   qw(timeout);
 use Try::Tiny;
 use WBM::Fail;
 
-sub new($class, $config) {
+sub new($class, $config, $theme) {
     my $self = {
         config  => $config,
         cache   => Breeze::Cache->new,
@@ -33,6 +34,13 @@ sub new($class, $config) {
 
     $self->validate;
     $self->init_logger;
+
+    $self->{theme} = Breeze::Theme->new(
+        $self->log->clone(category => "Breeze::Theme"),
+        $theme
+    );
+
+    $self->resolve_defaults;
     $self->init_modules;
     $self->init_events;
 
@@ -45,11 +53,9 @@ sub new($class, $config) {
 sub cfg($self)      { $self->{config}; }
 sub log($self)      { $self->{logger}; }
 sub cache($self)    { $self->{cache};  }
-sub ticks($self)    { \$self->{ticks};  }
-
-sub mods($self) {
-    return $self->{mods};
-}
+sub ticks($self)    { \$self->{ticks}; }
+sub theme($self)    { $self->{theme};  }
+sub mods($self)     { $self->{mods};   }
 
 sub mod($self, $name) {
     return $self->{mods_by_name}->{$name};
@@ -102,6 +108,15 @@ sub delete_timer($self, $key, $timer) {
 }
 
 # initializers
+
+sub resolve_defaults($self) {
+    foreach (qw(color background border)) {
+        my $ref = \$self->cfg->{defaults}->{$_};
+        $$ref = $self->theme->resolve($$ref)
+            if defined $$ref;
+    }
+}
+
 sub init_logger($self) {
     my $f = $self->cfg->{logfile};
     my %a = $self->cfg->%{qw(debug)};
@@ -161,6 +176,7 @@ sub init_modules($self) {
                 my %args = $modcfg->%{-name, @keys};
                 $args{-log}     = $modlog;
                 $args{-refresh} = $modcfg->{-refresh} // 0;
+                $args{-theme}   = $self->theme;
 
                 # create instance
                 return $moddrv->new(%args);
@@ -334,12 +350,10 @@ sub post_process_seg($self, $ret) {
 
         ++$alt;
 
-        # copy colors if required
+        # resolve colors if required
         foreach my $k (qw(color background border)) {
             next if !defined $data->{$k};
-            if ($data->{$k} =~ m/^%(?<attr>color|background|border)$/) {
-                $data->{$k} = $data->{$+{attr}};
-            }
+            $data->{$k} = $self->theme->resolve($data->{$k}) // $self->cfg->{defaults}->{$k};
         }
 
         # combine text, icon into full_text

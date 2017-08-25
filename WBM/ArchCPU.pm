@@ -80,7 +80,7 @@ sub invoke($self) {
 
     my $ncpu = int $self->{step} == -1 ? "A" : int $self->{step};
     my $util = $self->compute_usage(%data);
-    my $fg   = Breeze::Grad::get($util, qw(859900 b58900 dc322f));
+    my $fg   = $self->theme->grad($util, '%{archcpu.@grad,cpu.@grad,@green-to-red,green yellow red}');
 
     my $ret = {
         text        => sprintf("$ncpu %3d%%", $util),
@@ -88,8 +88,8 @@ sub invoke($self) {
         color       => $fg,
     };
 
-    $ret->{invert} = 0 if $util >= $self->{warning};
-    $ret->{blink}  = 0 if $util >= $self->{critical};
+    $ret->{invert} = $self->{refresh} if $util >= $self->{warning};
+    $ret->{blink}  = $self->{refresh} if $util >= $self->{critical};
     return $ret;
 }
 

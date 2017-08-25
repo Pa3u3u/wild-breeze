@@ -59,10 +59,12 @@ sub invoke($self) {
 
     my $ret;
     if ($muted) {
-        $ret->@{qw(color background)} = qw(002b36 93a1a1);
+        $ret->{color}       = '%{volume.muted.fg,black}';
+        $ret->{background}  = '%{volume.muted.bg,silver}';
     } else {
-        $ret->{color}      = $volume > 100 ? "238bd2"
-                           : Breeze::Grad::get($volume, qw(dc322f b58900 859900));
+        $ret->{color} = $volume > 100
+            ? "%{volume.overmax,cyan}"
+            : $self->theme->grad($volume, '%{volume.@grad,@red-to-green,red yellow green}');
 
         if (($self->{last} // $volume) != $volume) {
             $ret->{invert} = 1;

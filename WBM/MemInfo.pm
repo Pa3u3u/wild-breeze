@@ -114,8 +114,8 @@ sub invoke($self) {
 
     my $watch = $data{$fmt->{watch}};
     my $color = $fmt->{more} eq "better"
-        ? Breeze::Grad::get($watch, qw(dc322f b58900 859900))
-        : Breeze::Grad::get($watch, qw(859900 b58900 dc322f));
+        ? $self->theme->grad($watch, '%{meminfo.@better,@red-to-green,red yellow green}')
+        : $self->theme->grad($watch, '%{meminfo.@worse,@green-to-red,green yellow red}');
 
     my $ret = {
         icon    => $fmt->{icon},
