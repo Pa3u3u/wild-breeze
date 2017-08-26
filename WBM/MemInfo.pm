@@ -145,7 +145,7 @@ sub invoke($self) {
 
 sub refresh_on_event($) { 1; }
 
-sub on_middle_click($self) {
+sub on_left_click($self) {
     $self->{stopped} = !$self->{stopped};
 }
 

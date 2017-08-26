@@ -7,7 +7,6 @@ use warnings;
 
 use FindBin     qw($Bin);
 use lib         "$Bin";
-use open        ":std", ":encoding(utf-8)";
 
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
@@ -50,6 +49,12 @@ sub read_config($filename) {
 #-------------------------------------------------------------------------------
 # Entry
 #-------------------------------------------------------------------------------
+
+# set encoding on standatd IO handles except STDIN, since we are going to use
+# unbuffered sysread which cannot operate on fhs with utf-8 layers
+# binmode STDIN, ":encoding(utf-8)";
+binmode STDOUT, ":encoding(utf-8)";
+binmode STDERR, ":encoding(utf-8)";
 
 # decode ARGV to utf8
 utf8::decode($_) foreach @ARGV;
@@ -121,12 +126,14 @@ while (1) {
 
     # wait for an event, at most a second by default
     foreach my $hndl ($select->can_read($config->{tick} // 1)) {
-        my $line = <$hndl>;
-        last MAIN_LOOP unless defined $line;
-        chomp $line;
+        my $ev_data;
+        last unless sysread $hndl, $ev_data, 4096;
+
+        # decode data
+        utf8::decode($ev_data);
 
         # add data to parser
-        $ev_parser->incr_parse($line);
+        $ev_parser->incr_parse($ev_data);
 
         # first, get rid of leading '['
         if (!$ev_started && $ev_parser->incr_text =~ s/^\s*\[//) {

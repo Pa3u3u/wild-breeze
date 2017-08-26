@@ -39,7 +39,9 @@ sub run_command($self, $cmd, %opt) {
     my $status = $?;
     # IPC::Run3 does not restore encoding layers, reset them manually
     # https://rt.cpan.org/Public/Bug/Display.html?id=69011
-    binmode STDIN;  binmode STDIN,  ":encoding(utf-8)";
+
+    # Except STDIN, see 'wild-breeze' script for explanation
+    # binmode STDIN;  binmode STDIN,  ":encoding(utf-8)";
     binmode STDOUT; binmode STDOUT, ":encoding(utf-8)";
     binmode STDERR; binmode STDOUT, ":encoding(utf-8)";
 
