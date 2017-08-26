@@ -1,11 +1,11 @@
-package WBM::LED;
+package Leaf::LED;
 
 use v5.26;
 use utf8;
 use strict;
 use warnings;
 
-use parent      qw(WBM::Command);
+use parent      qw(Leaf::Command);
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
@@ -56,5 +56,7 @@ sub invoke($self) {
 
     return $ret;
 }
+
+# vim: syntax=perl5-24
 
 1;

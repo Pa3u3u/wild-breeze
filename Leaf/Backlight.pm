@@ -1,10 +1,10 @@
-package WBM::Backlight;
+package Leaf::Backlight;
 
 use utf8;
 use strict;
 use warnings;
 
-use parent      "WBM::Driver";
+use parent      "Leaf::Driver";
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
@@ -62,5 +62,7 @@ sub on_middle_click($) {
 
     return { reset_all => 1, blink => 4 };
 }
+
+# vim: syntax=perl5-24
 
 1;

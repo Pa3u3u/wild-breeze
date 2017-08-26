@@ -1,10 +1,10 @@
-package WBM::Spotify;
+package Leaf::Spotify;
 
 use utf8;
 use strict;
 use warnings;
 
-use parent      "WBM::Driver";
+use parent      "Leaf::Driver";
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
@@ -176,5 +176,7 @@ sub on_next($self) {
 
     $sp->Previous;
 }
+
+# vim: syntax=perl5-24
 
 1;

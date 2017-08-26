@@ -8,12 +8,6 @@ use warnings;
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
-use Breeze::Cache;
-use Breeze::Counter;
-use Breeze::Logger;
-use Breeze::Logger::File;
-use Breeze::Logger::StdErr;
-use Breeze::Theme;
 use Carp;
 use Data::Dumper;
 use JSON::XS;
@@ -21,7 +15,15 @@ use Module::Load;
 use Time::HiRes;
 use Time::Out   qw(timeout);
 use Try::Tiny;
-use WBM::Fail;
+
+# Wild Breeze modules
+use Breeze::Cache;
+use Breeze::Counter;
+use Breeze::Logger;
+use Breeze::Logger::File;
+use Breeze::Logger::StdErr;
+use Breeze::Theme;
+use Leaf::Fail;
 
 sub new($class, $config, $theme) {
     my $self = {
@@ -188,19 +190,19 @@ sub init_modules($self) {
             };
 
             # module failed to initialize?
-            if (!defined $module && $moddrv ne "WBM::Fail") {
+            if (!defined $module && $moddrv ne "Leaf::Fail") {
                 # replace module description with dummy text and redo
                 $self->log->info("replacing '$moddrv' with failed placeholder");
                 $modcfg = {
                     -name   => $modname,
-                    -driver => "WBM::Fail",
+                    -driver => "Leaf::Fail",
                     text    => "'$modname' ($moddrv)",
                 };
 
                 redo;
             } elsif (!defined $module) {
-                # WBM::Fail failed, well, fuck
-                $self->log->fatal("WBM::Fail failed");
+                # Leaf::Fail failed, well, fuck
+                $self->log->fatal("Leaf::Fail failed");
             }
 
             my %counterconf = (from => 0, step => 1, cycle => 0);
@@ -256,7 +258,7 @@ sub fail_module($self, $entry, $timer) {
 
     if (!($$tmr--)) {
         $self->log->error("module depleted timer '$timer' for the last time, disabling");
-        $entry->{mod} = WBM::Fail->new(
+        $entry->{mod} = Leaf::Fail->new(
             -entry => $entry->{conf}->{-name},
             -log   => $entry->{log},
             text   => "$entry->{conf}->{-name}($entry->{conf}->{-driver})",

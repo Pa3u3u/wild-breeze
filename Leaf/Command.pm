@@ -1,11 +1,11 @@
-package WBM::Command;
+package Leaf::Command;
 
 use v5.26;
 use utf8;
 use strict;
 use warnings;
 
-use parent      qw(WBM::Driver);
+use parent      qw(Leaf::Driver);
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 

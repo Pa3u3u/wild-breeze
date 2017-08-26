@@ -1,11 +1,11 @@
-package WBM::ArchCPU;
+package Leaf::ArchCPU;
 
 use v5.26;
 use utf8;
 use strict;
 use warnings;
 
-use parent      qw(WBM::Command);
+use parent      qw(Leaf::Command);
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
@@ -109,5 +109,7 @@ sub on_middle_click($self) {
     delete $self->{prev};
     $self->{step}->reset;
 }
+
+# vim: syntax=perl5-24
 
 1;
