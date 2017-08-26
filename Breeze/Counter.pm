@@ -70,6 +70,14 @@ sub new($class, %args) {
     return $self;
 }
 
+sub fixed($class,$to) {
+    return $class->new(to => $to, cycle => 1);
+}
+
+sub countdown($class,$from) {
+    return $class->new(from => $from, current => $from);
+}
+
 sub next($self) {
     if (($self->{current} += $self->{step}) > $self->{to}) {
         $self->{current} = $self->{cycle} ? $self->{from} : $self->{to};
