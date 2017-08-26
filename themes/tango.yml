@@ -8,7 +8,7 @@ green:      $8ae234
 blue:       $3465a4
 magenta:    $ad7fa8
 yellow:     $edd400
-cyan:       $729fcf
+cyan:       $00f0d0
 
 orange:     $f57900
 violet:     $5c3566
@@ -16,10 +16,12 @@ purple:     $5c3566
 
 # specials
 bg1:        black
-bg2:        gray
-aluminum:   888a85
+bg2:        $404443
+aluminum:   $888a85
 
 spotify.playing:   green
+
+# gradients
 backlight.@grad:
     aluminum
     white
