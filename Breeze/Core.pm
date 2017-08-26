@@ -337,7 +337,10 @@ sub post_process_seg($self, $ret) {
     my $alt = 0;
     foreach my $data (@$ret) {
         # skip separators
-        next if exists $data->{separator};
+        if (exists $data->{separator}) {
+            ++$alt;
+            next;
+        }
 
         # add defaults
         while (my ($k, $v) = each $self->cfg->{defaults}->%*) {
@@ -347,8 +350,6 @@ sub post_process_seg($self, $ret) {
                         ? $self->cfg->{alternate}
                         : $v;
         }
-
-        ++$alt;
 
         # resolve colors if required
         foreach my $k (qw(color background border)) {
