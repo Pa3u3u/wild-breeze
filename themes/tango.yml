@@ -25,3 +25,17 @@ spotify.playing:   green
 backlight.@grad:
     aluminum
     white
+
+meminfo.@worse:
+    green
+    green
+    green
+    yellow
+    red
+
+meminfo.@better:
+    red
+    yellow
+    green
+    green
+    green
