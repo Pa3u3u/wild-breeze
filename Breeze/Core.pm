@@ -11,7 +11,6 @@ no  warnings    qw(experimental::signatures);
 use Carp;
 use Data::Dumper;
 use JSON::XS;
-use Module::Load;
 use Time::HiRes;
 use Time::Out   qw(timeout);
 use Try::Tiny;
@@ -19,6 +18,7 @@ use Try::Tiny;
 # Wild Breeze modules
 use Breeze::Cache;
 use Breeze::Counter;
+use Breeze::Instances;
 use Breeze::Logger;
 use Breeze::Logger::File;
 use Breeze::Logger::StdErr;
@@ -82,33 +82,6 @@ sub u8($self, $what) {
     return $t;
 }
 
-# timer manipulation
-sub get_or_set_timer($self, $key, $timer, $ticks) {
-    my $timers = $self->mod($key)->{tmrs};
-
-    # nothing to do if no timer set and ticks is undefined
-    return if !defined $timers->{$timer} && !defined $ticks;
-
-    # create timer if there is none
-    if (!defined $timers->{$timer}) {
-        # optimization: do not store counter for only one cycle,
-        # use local variable instead
-        if ($ticks == 0) {
-            my $temp = 0;
-            return \$temp;
-        }
-
-        $timers->{$timer} = Breeze::Counter->new(current => $ticks);
-    }
-
-    # return a reference to the timer
-    return \$timers->{$timer};
-}
-
-sub delete_timer($self, $key, $timer) {
-    delete $self->mod($key)->{tmrs}->{$timer};
-}
-
 # initializers
 
 sub resolve_defaults($self) {
@@ -145,95 +118,53 @@ sub init_modules($self) {
         if (ref $modcfg eq "") {
             # it might be a separator
             if ($modcfg eq "separator") {
-                push $self->{mods}->@*, { separator => undef };
+                push $self->{mods}->@*, Breeze::Separator->new();
             # otherwise it's an error
             } else {
                 $self->log->fatal("scalar '$modcfg' found instead of module description");
             }
         } else {
-            # check for required parameters
-            foreach my $key (qw(-name -driver)) {
-                $self->log->fatal("missing '$key' in module description")
-                    unless defined $modcfg->{$key};
-            }
+            my ($name, $driver) = ($modcfg->{-name} // "<undef>", $modcfg->{-driver} // "<undef>");
 
-            # check that only known keys begin with '-'
-            foreach my $key (grep { $_ =~ m/^-/ } (keys $modcfg->%*)) {
-                $self->log->warn("unknown '$key' in module description")
-                    unless $key =~ m/^-(name|refresh|driver|timeout)$/;
-            }
+            my $inst = try {
+                if (!defined $modcfg->{-timeout}) {
+                    $modcfg->{-timeout} = $self->cfg->{timeout};
+                } elsif ($modcfg->{-timeout} <= 0) {
+                    $self->log->fatal("invalid timeout for '$name'($driver): $modcfg->{-timeout}");
+                }
 
-            my ($moddrv, $modname) = $modcfg->@{qw(-driver -name)};
-            $self->log->info("trying to load '$moddrv' as '$modname'");
-
-            # initialize the module instance
-            my $modlog = $self->log->clone(category => "$modname($moddrv)");
-
-            my $module = try {
-                load $moddrv;
-
-                # pass only the '-name' parameter and those that
-                # do not begin with '-'
-                my @keys = grep { $_ !~ m/^-/ } (keys $modcfg->%*);
-                my %args = $modcfg->%{-name, @keys};
-                $args{-log}     = $modlog;
-                $args{-refresh} = $modcfg->{-refresh} // 0;
-                $args{-theme}   = $self->theme;
-
-                # create instance
-                return $moddrv->new(%args);
+                Breeze::Module->new($modcfg, {
+                    log         => $self->log,
+                    theme       => $self->theme,
+                    timeouts    => $self->cfg->{timeouts},
+                    failures    => $self->cfg->{failures},
+                });
             } catch {
-                chomp $_;
-                $self->log->error("failed to initialize '$modname'");
+                $self->log->error("failed to instantiate '$name'($driver)");
                 $self->log->error($_);
-                return;
             };
 
-            # module failed to initialize?
-            if (!defined $module && $moddrv ne "Leaf::Fail") {
-                # replace module description with dummy text and redo
-                $self->log->info("replacing '$moddrv' with failed placeholder");
+            my $error_msg = $_;
+            # if module failed
+            if (!defined $inst) {
+                # if it was Leaf::Fail, there is nothing else to do
+                if ($driver eq "Leaf::Fail") {
+                    $self->log->fatal("Leaf::Fail failed, something's gone terribly wrong");
+                }
+
+                $self->log->info("replacing  with failed placeholder");
+
                 $modcfg = {
-                    -name   => $modname,
+                    -name   => "__failed_" . $self->{mods}->$#*,
                     -driver => "Leaf::Fail",
-                    text    => "'$modname' ($moddrv)",
+                    text    => "'$name'($driver)",
                 };
 
                 redo;
-            } elsif (!defined $module) {
-                # Leaf::Fail failed, well, fuck
-                $self->log->fatal("Leaf::Fail failed");
             }
 
-            my %counterconf = (from => 0, step => 1, cycle => 0);
-
-            # if module uses custom timeout, notify log
-            if (defined $modcfg->{-timeout} && $modcfg->{-timeout} >= 1) {
-                $self->log->info("$modname has custom timeout '$modcfg->{-timeout}'");
-            } elsif (defined $modcfg->{-timeout}) {
-                $self->log->info("refusing to use timeout '$modcfg->{-timeout}' as it is invalid");
-                delete $modcfg->{-timeout};
-            }
-
-            # got here so far, save all
-            my $entry = {
-                conf => $modcfg,
-                mod  => $module,
-                log  => $modlog,
-                tmrs => {
-                    timeout => Breeze::Counter->new(%counterconf,
-                        current => $self->cfg->{timeouts},
-                        to      => $self->cfg->{timeouts},
-                    ),
-                    fail    => Breeze::Counter->new(%counterconf,
-                        current => $self->cfg->{failures},
-                        to      => $self->cfg->{failures},
-                    ),
-                },
-            };
-
-            push $self->{mods}->@*, $entry;
-            $self->{mods_by_name}->{$modname} = $entry;
+            push $self->{mods}->@*, $inst;
+            $self->{mods_by_name}->{$name} = $inst;
         }
     }
 }
@@ -253,25 +184,21 @@ sub init_events($self) {
     ];
 }
 
-sub fail_module($self, $entry, $timer) {
-    my $tmr = \$entry->{tmrs}->{$timer};
+sub fail_module($self, $module, $timer) {
+    my $tmr = $module->get_timer($timer);
 
     if (!($$tmr--)) {
         $self->log->error("module depleted timer '$timer' for the last time, disabling");
-        $entry->{mod} = Leaf::Fail->new(
-            -entry => $entry->{conf}->{-name},
-            -log   => $entry->{log},
-            text   => "$entry->{conf}->{-name}($entry->{conf}->{-driver})",
-        );
-        return $entry->{mod}->invoke;
+        $module->fail;
+        return $module->invoke;
     } else {
         # temporarily disable module
         return {
-            text    => "$entry->{conf}->{-name}($entry->{conf}->{-driver})",
+            text    => $module->name_canon,
             blink   => $self->cfg->{cooldown},
             cache   => $self->cfg->{cooldown},
-            background  => "b58900",
-            color       => "002b36",
+            background  => "%{core.fail.bg,orange,yellow",
+            color       => "%{core.fail.fg,fg,white}",
             icon        => ($timer eq "fail" ? "" : ""),
         };
     }
@@ -280,49 +207,38 @@ sub fail_module($self, $entry, $timer) {
 sub run($self) {
     my $ret = [];
 
-    foreach my $entry ($self->mods->@*) {
+    foreach my $module ($self->mods->@*) {
         # separators will be handled in postprocessing
-        if (exists $entry->{separator}) {
-            push @$ret, { %$entry };
+        if ($module->is_separator) {
+            push @$ret, { separator => 1 };
             next;
         }
 
         # try to get cached output first
-        my $data = $self->cache->get($entry->{conf}->{-name});
+        my $data = $self->cache->get($module->name);
 
         if (!defined $data) {
-            $data = try {
-                my $to  = $entry->{conf}->{-timeout} // $self->cfg->{timeout};
-                my $tmp = timeout($to => sub {
-                    return $entry->{mod}->invoke;
-                });
+            # run module
+            $data = $module->run("invoke");
 
-                if ($@) {
-                    $self->log->error("module '$entry->{conf}->{-name}' timeouted");
-                    return $self->fail_module($entry, "timeout");
-                } elsif (!defined $tmp || ref $tmp ne "HASH") {
-                    $self->log->fatal("module '$entry->{conf}->{-name}' returned ", (ref($tmp) || "undef"));
-                }
-
-                return $tmp;
-            } catch {
-                chomp $_;
-                $self->log->error("error in '$entry->{conf}->{-name}' ($entry->{conf}->{-driver})");
-                $self->log->error($_);
-                return $self->fail_module($entry, "fail");
-            };
+            if ($data->{fatal}) {
+                $data = $self->fail_module($module, "fail");
+            } elsif ($data->{timeout}) {
+                $data = $self->fail_module($module, "timeout");
+            } elsif ($data->{ok}) {
+                $data = $data->{content};
+            } else {
+                $self->log->fatal("module wrapper did not return 'ok'");
+            }
         } else {
             # ignore cached 'blink', 'invert', 'reset_blink' and 'reset_invert'
             delete $data->@{qw(blink invert cache reset_blink reset_invert reset_all)};
         }
 
-        # set entry and instance
-        $data->@{qw(entry instance)} = $entry->{conf}->@{qw(-name -name)};
-
-        if (($entry->{conf}->{-refresh} // 0) >= 1) {
-            $self->cache->set($entry->{conf}->{-name}, $data, $entry->{conf}->{-refresh});
+        if (($module->refresh // 0) >= 1) {
+            $self->cache->set($module->name, $data, $module->refresh);
         } elsif (defined $data->{cache} && $data->{cache} >= 0) {
-            $self->cache->set($entry->{conf}->{-name}, $data, $data->{cache});
+            $self->cache->set($module->name, $data, $data->{cache});
         }
 
         push @$ret, $data;
@@ -373,10 +289,11 @@ sub post_process_inversion($self, $ret) {
         # separators are not supposed to blink
         next if exists $seg->{separator};
 
-        $self->delete_timer($seg->{entry}, "invert")
+        my $module = $self->mod($seg->{name});
+        $module->delete_timer("invert")
             if $seg->{reset_invert} || $seg->{reset_all};
 
-        my $timer = $self->get_or_set_timer($seg->{entry}, "invert", $seg->{invert});
+        my $timer = $module->get_or_set_timer("invert", $seg->{invert});
         next if !defined $timer;
 
         # advance timer, use global if evaluates to inf
@@ -387,7 +304,7 @@ sub post_process_inversion($self, $ret) {
         $seg->{invert} = 1 if $tick >= 0;
 
         # remove timer if expired
-        $self->delete_timer($seg->{entry}, "invert") unless $$timer--;
+        $module->delete_timer("invert") unless $$timer--;
     }
 }
 
@@ -396,10 +313,11 @@ sub post_process_blinking($self, $ret) {
         # separators are not supposed to blink
         next if exists $seg->{separator};
 
-        $self->delete_timer($seg->{entry}, "blink")
+        my $module = $self->mod($seg->{name});
+        $module->delete_timer("blink")
             if $seg->{reset_blink} || $seg->{reset_all};
 
-        my $timer = $self->get_or_set_timer($seg->{entry}, "blink", $seg->{blink});
+        my $timer = $module->get_or_set_timer("blink", $seg->{blink});
         next if !defined $timer;
 
         # advance timer, use global if evaluates to inf
@@ -410,7 +328,7 @@ sub post_process_blinking($self, $ret) {
         $seg->{invert} = ($seg->{invert} xor ($tick % 2 == 0));
 
         # remove timer if expired
-        $self->delete_timer($seg->{entry}, "blink") unless $$timer--;
+        $module->delete_timer("blink") unless $$timer--;
     }
 }
 
@@ -455,7 +373,7 @@ sub post_process_sep($self, $ret) {
             $sep->{background} = $ret->[$ix - 1]->{background} // $default_bg;
         }
 
-        $sep->{entry} = $sep->{instance} = "__separator_$counter";
+        $sep->{name} = $sep->{instance} = "__separator_$counter";
         ++$counter;
     }
 }
@@ -473,7 +391,7 @@ sub post_process_attr($self, $ret) {
         $seg->{full_text} =~ s/%utf8\{(.*?)\}/$self->u8($1)/ge;
 
         # add padding if requested
-        if ($self->cfg->{padding} && $seg->{entry} !~ m/^__separator_/) {
+        if ($self->cfg->{padding} && $seg->{name} !~ m/^__separator_/) {
             my $pad = " " x $self->cfg->{padding};
             $seg->{full_text} =~ s/^(\S)/$pad$1/;
             $seg->{full_text} =~ s/(\S)$/$1$pad/;
@@ -516,24 +434,22 @@ sub event_button($self, $code) {
 }
 
 sub process_event($self, $mod, $data) {
-    my $entry = $mod->{conf}->{-name};
-
     # module might want to redraw after event
-    $self->cache->flush($entry)
+    $self->cache->flush($mod->name)
         if $data->{flush};
 
     # stop timers
-    $self->delete_timer($entry, "blink")
+    $mod->delete_timer("blink")
         if $data->{reset_blink}  || $data->{reset_all};
 
-    $self->delete_timer($entry, "invert")
+    $mod->delete_timer("invert")
         if $data->{reset_invert} || $data->{reset_all};
 
     # reset timers on demand
-    $self->get_or_set_timer($entry, "blink", $data->{blink})
+    $mod->get_or_set_timer("blink", $data->{blink})
         if defined $data->{blink};
 
-    $self->get_or_set_timer($entry, "invert", $data->{invert})
+    $mod->get_or_set_timer("invert", $data->{invert})
         if defined $data->{invert};
 }
 
@@ -549,46 +465,25 @@ sub event($self, $event) {
     }
 
     my $button = $self->event_button($event->{button});
-    my $data = try {
-        if ($mod->{mod}->refresh_on_event) {
-            $self->cache->flush($target);
-        }
+    if (!defined $button) {
+        $self->log->error("got unknown event '$event->{button}' for '$target'");
+        return;
+    }
 
-        my $to  = $mod->{conf}->{-timeout} // $self->cfg->{timeout};
-        my $tmp = timeout($to => sub {
-            if (!defined $button) {
-                $self->log->error("got unknown event '$event->{button}' for '$target'");
-                return $mod->{mod}->on_event;
-            } else {
-                my $method = "on_$button";
-                return $mod->{mod}->$method;
-            }
-        });
+    $self->cache->flush($mod->name)
+        if ($mod->refresh_on_event);
 
-        if ($@) {
-            $self->log->error("event for '$target' timeouted");
+    my $data = $mod->run("on_$button");
 
-            # flush cache and replace entry with failed placeholder
-            $self->cache->flush($target);
-            my $ret = $self->fail_module($mod, "timeout");
-            $ret->{text} .= "[event]";
-            $self->cache->set($target, $ret, $self->cfg->{cooldown});
-            return $ret;
-        }
-
-        return $tmp;
-    } catch {
-        chomp $_;
-        $self->log->error("event for '$target' failed");
-        $self->log->error($_);
-
-        # flush cache and replace entry with failed placeholder
-        $self->cache->flush($target);
-        my $ret = $self->fail_module($mod, "fail");
-        $ret->{text} .= "[event]";
-        $self->cache->set($target, $ret, $self->cfg->{cooldown});
-        return $ret;
-    };
+    if ($data->{fatal}) {
+        $data = $self->fail_module($mod, "fail");
+    } elsif ($data->{timeout}) {
+        $data = $self->fail_module($mod, "timeout");
+    } elsif ($data->{ok}) {
+        $data = $data->{content};
+    } else {
+        $self->log->fatal("module wrapper did not return 'ok'");
+    }
 
     if (defined $data and ref $data eq "HASH") {
         $self->process_event($mod, $data);
