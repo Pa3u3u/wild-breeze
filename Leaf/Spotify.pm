@@ -62,7 +62,7 @@ sub show_all {
     utf8::decode($title);
     utf8::decode($artists);
 
-    my $text    = sprintf "(%15s | %15s)", $self->wfix($title, 15), $self->wfix($artists, 15);
+    my $text    = sprintf "%15s | %15s", $self->wfix($title, 15), $self->wfix($artists, 15);
     my $icon    = $ico{$status};
     return ($icon, $text);
 }
