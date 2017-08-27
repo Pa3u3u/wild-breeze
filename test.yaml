@@ -147,6 +147,15 @@ modules:
       allow-boost:  yes
       step:         2
     - separator
+    - -name:        wifi
+      -driver:      Leaf::IPAddr
+      device:       wlp1s0
+      icon:         
+    - -name:        ethernet
+      -driver:      Leaf::IPAddr
+      device:       enp0s31f6
+      icon:         
+    - separator
     - -name:        time
       -driver:      Leaf::Time
       -refresh:     0
