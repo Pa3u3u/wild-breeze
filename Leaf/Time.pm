@@ -5,7 +5,7 @@ use utf8;
 use strict;
 use warnings;
 
-use parent      qw(Leaf::Driver);
+use parent      qw(Stalk::Driver);
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 

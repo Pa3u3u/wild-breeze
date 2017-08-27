@@ -4,7 +4,7 @@ use utf8;
 use strict;
 use warnings;
 
-use parent      "Leaf::Driver";
+use parent      "Stalk::Driver";
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
@@ -24,7 +24,7 @@ sub invoke($self) {
     my $max = qx(cat /sys/class/backlight/$self->{video}/max_brightness);
     my $cur = qx(cat /sys/class/backlight/$self->{video}/brightness);
 
-    chomp($max,$cur);
+    chomp($max, $cur);
 
     my $p = int ((100 * $cur) / $max);
     my $c = $self->theme->grad($p, '%{backlight.@grad,gray white}');

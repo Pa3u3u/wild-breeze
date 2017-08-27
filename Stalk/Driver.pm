@@ -1,4 +1,4 @@
-package Leaf::Driver;
+package Stalk::Driver;
 
 use v5.26;
 use utf8;
@@ -20,7 +20,7 @@ sub theme($self)    { $self->{theme}; }
 
 sub refresh_on_event($) { 0; }
 sub invoke($self) {
-    $self->log->fatal("invoke called on Leaf::Driver, perhaps forgotten override?");
+    $self->log->fatal("invoke called on Stalk::Driver, perhaps forgotten override?");
 }
 
 sub on_left_click($) {}

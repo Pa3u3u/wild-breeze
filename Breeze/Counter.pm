@@ -70,11 +70,11 @@ sub new($class, %args) {
     return $self;
 }
 
-sub fixed($class,$to) {
+sub fixed($class, $to) {
     return $class->new(to => $to, cycle => 1);
 }
 
-sub countdown($class,$from) {
+sub countdown($class, $from) {
     return $class->new(from => $from, current => $from);
 }
 

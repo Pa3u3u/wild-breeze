@@ -1,10 +1,11 @@
 package Leaf::Spotify;
 
+use v5.26;
 use utf8;
 use strict;
 use warnings;
 
-use parent      "Leaf::Driver";
+use parent      "Stalk::Driver";
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 

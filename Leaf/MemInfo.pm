@@ -5,7 +5,7 @@ use utf8;
 use strict;
 use warnings;
 
-use parent      qw(Leaf::Driver);
+use parent      qw(Stalk::Driver);
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
@@ -14,7 +14,7 @@ use Breeze::Grad;
 use Data::Dumper;
 use Linux::MemInfo;
 
-sub new($class,%args) {
+sub new($class, %args) {
     my $self = $class->SUPER::new(%args);
 
     $self->{stopped}    = 0;
@@ -149,12 +149,12 @@ sub on_left_click($self) {
     $self->{stopped} = !$self->{stopped};
 }
 
-sub on_wheel_up($self) {
+sub on_next($self) {
     ++$self->{step};
     return { reset_all => 1 };
 }
 
-sub on_wheel_down($self) {
+sub on_back($self) {
     --$self->{step};
     return { reset_all => 1 };
 }

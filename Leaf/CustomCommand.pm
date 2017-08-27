@@ -5,7 +5,7 @@ use utf8;
 use strict;
 use warnings;
 
-use parent      qw(Leaf::Command);
+use parent      qw(Stalk::Command);
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
@@ -29,7 +29,10 @@ sub invoke($self) {
     my $ix  = defined $self->{ix} ? int $self->{ix} : 0;
     my $cmd = $self->{commands}->[$ix];
 
-    my ($out,undef,undef) = $self->run_command($cmd, stderr_fatal => 1, status_fatal => 1);
+    my ($out, undef, undef) = $self->run_command($cmd,
+        stderr_fatal => 1,
+        status_fatal => 1,
+    );
 
     my $ret = {
         text    => $out,
