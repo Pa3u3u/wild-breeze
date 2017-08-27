@@ -139,7 +139,7 @@ sub invoke {
         color       => $c,
     };
 
-    $ret->{invert} = 1;
+    $ret->{invert} = 0;
     return $ret;
 }
 
