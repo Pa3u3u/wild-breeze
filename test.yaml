@@ -93,6 +93,15 @@ modules:
         driver:         Leaf::Spotify
         timeout:        1
     - separator
+    - mail:
+        driver:         Leaf::IMAPUnread
+        muttrc:         /home/cweorth/.muttrc
+        server:         mail.fi.muni.cz
+        port:           993
+        filter:         "^Personal/"
+        check:          180
+        notify:         5
+    - separator
     - cpu:
         driver:         Leaf::ArchCPU
         refresh:        1
