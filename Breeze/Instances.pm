@@ -17,6 +17,7 @@ package Breeze::Module;
 use Breeze::Counter;
 use Carp;
 use Module::Load;
+use Scalar::Util    qw(blessed);
 use Time::Out;
 
 sub new($class, $name, $def, $attrs) {
@@ -49,6 +50,9 @@ sub initialize($self, $theme) {
 
     # create instance
     $self->{module} = (scalar $self->driver)->new(%args);
+    if (!defined $self->{module} || !blessed($self->{module})) {
+        $self->log->fatal("driver constructor finished but did not return a blessed object");
+    }
 }
 
 sub init_timers($self, $attrs) {

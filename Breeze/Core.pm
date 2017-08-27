@@ -143,6 +143,7 @@ sub init_modules($self) {
                     failures    => $self->cfg->{failures},
                 });
             } catch {
+                chomp $_;
                 $self->log->error("failed to instantiate '$name'($driver)");
                 $self->log->error($_);
                 undef;
