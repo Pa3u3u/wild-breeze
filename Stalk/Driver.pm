@@ -9,16 +9,20 @@ use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
 sub new($class, %args) {
-    my $self = bless {}, $class;
-    $self->@{qw(entry log theme refresh)} = delete @args{qw(-name -log -theme -refresh)};
+    my $self = bless {
+        %args{qw(name driver timeout refresh log theme)},
+    }, $class;
+
+    delete @args{qw(name driver timeout refresh log theme)};
     return $self;
 }
 
 sub log($self)      { $self->{log};   }
-sub entry($self)    { $self->{entry}; }
+sub name($self)     { $self->{name};  }
 sub theme($self)    { $self->{theme}; }
 
 sub refresh_on_event($) { 0; }
+
 sub invoke($self) {
     $self->log->fatal("invoke called on Stalk::Driver, perhaps forgotten override?");
 }

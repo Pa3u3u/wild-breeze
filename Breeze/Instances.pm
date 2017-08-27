@@ -19,22 +19,16 @@ use Carp;
 use Module::Load;
 use Time::Out;
 
-sub new($class, $def, $attrs) {
-    my $self = bless {}, $class;
+sub new($class, $name, $def, $attrs) {
+    my $self = bless {
+        name    => $name,
+        def     => $def,
+    }, $class;
 
     # check for required parameters
-    foreach my $key (qw(-name -driver)) {
-        croak "missing '$key' in module description"
-            unless defined $def->{$key};
-    }
+    croak "missing 'driver' in module description"
+        unless defined $def->{driver};
 
-    # check that only known keys begin with '-'
-    foreach my $key (grep { $_ =~ m/^-/ } (keys $def->%*)) {
-        croak "unknown control key '$key' in module instance"
-            unless $key =~ m/^-(name|driver|refresh|timeout)$/;
-    }
-
-    $self->{modcfg} = $def;
     $self->{log}    = $attrs->{log}->clone(category => $self->name_canon);
 
     $self->initialize($attrs->{theme});
@@ -46,12 +40,12 @@ sub new($class, $def, $attrs) {
 sub initialize($self, $theme) {
     load $self->driver;
 
-    # pass only the '-name' parameter and those that do not begin with '-'
-    my @keys = grep { $_ !~ m/^-/ } (keys $self->{modcfg}->%*);
-    my %args = $self->{modcfg}->%{-name, @keys};
-    $args{-log}     = $self->log;
-    $args{-refresh} = $self->refresh // 0;
-    $args{-theme}   = $theme;
+    my %args = (
+        name    => $self->name,
+        log     => $self->log,
+        theme   => $theme,
+        $self->{def}->%*
+    );
 
     # create instance
     $self->{module} = (scalar $self->driver)->new(%args);
@@ -64,13 +58,14 @@ sub init_timers($self, $attrs) {
     };
 }
 
-sub log($s)     { $s->{log}; }
-sub name($s)    { $s->{modcfg}->{-name};    }
-sub driver($s)  { $s->{modcfg}->{-driver};  }
-sub timeout($s) { $s->{modcfg}->{-timeout}; }
-sub refresh($s) { $s->{modcfg}->{-refresh}; }
+sub log($s)     { $s->{log};  }
+sub name($s)    { $s->{name}; }
+sub driver($s)  { $s->{def}->{driver};  }
+sub timeout($s) { $s->{def}->{timeout}; }
+sub refresh($s) { $s->{def}->{refresh}; }
 sub timers($s)  { $s->{timers}; }
 sub module($s)  { $s->{module}; }
+
 sub name_canon($s) { sprintf "'%s'(%s)", $s->name, $s->driver; }
 sub refresh_on_event($s) { $s->module->refresh_on_event; }
 
@@ -86,6 +81,7 @@ sub set_timer($self, $timer, $ticks) {
     croak "Ticks or timer invalid"
         unless defined $timer && defined $ticks && $ticks >= 0;
 
+    $self->log->debug($self->name, "->set_timer($timer,$ticks)");
     # optimization: do not store counter for only one cycle,
     # use local variable instead
     if ($ticks == 0) {
@@ -100,6 +96,7 @@ sub set_timer($self, $timer, $ticks) {
 }
 
 sub get_or_set_timer($self, $timer, $ticks = undef) {
+    $self->log->debug($self->name, "->get_or_set_timer($timer,", ($ticks // "undef"), ")");
     my $tmref = $self->get_timer($timer);
 
     if (!defined $$tmref && defined $ticks && $ticks >= 0) {
@@ -111,14 +108,15 @@ sub get_or_set_timer($self, $timer, $ticks = undef) {
 }
 
 sub delete_timer($self, $timer) {
+    $self->log->debug($self->name, "->delete_timer($timer)");
     delete $self->timers->{$timer};
 }
 
 sub fail($self) {
     $self->{module} = Leaf::Fail->new(
-        -name   => $self->name,
-        -log    => $self->log,
-        text    => sprintf("'%s'(%s)", $self->name, $self->driver),
+        name    => $self->name,
+        log     => $self->log,
+        text    => $self->canon_name,
     );
 }
 

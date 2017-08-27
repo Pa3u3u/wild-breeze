@@ -75,7 +75,7 @@ sub fixed($class, $to) {
 }
 
 sub countdown($class, $from) {
-    return $class->new(from => $from, current => $from);
+    return $class->new(to => $from, current => $from);
 }
 
 sub next($self) {

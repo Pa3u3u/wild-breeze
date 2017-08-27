@@ -123,17 +123,20 @@ sub init_modules($self) {
             } else {
                 $self->log->fatal("scalar '$modcfg' found instead of module description");
             }
-        } else {
-            my ($name, $driver) = ($modcfg->{-name} // "<undef>", $modcfg->{-driver} // "<undef>");
+        } elsif (ref $modcfg eq "HASH" && keys %$modcfg == 1) {
+            my $name        = (keys %$modcfg)[0];
+            my $template    = $modcfg->{$name};
+            my $driver      = $template->{driver} // "<undef>";
 
+            $self->log->debug("trying to instantiate '$name'($driver)");
             my $inst = try {
-                if (!defined $modcfg->{-timeout}) {
-                    $modcfg->{-timeout} = $self->cfg->{timeout};
-                } elsif ($modcfg->{-timeout} <= 0) {
-                    $self->log->fatal("invalid timeout for '$name'($driver): $modcfg->{-timeout}");
+                if (!defined $template->{timeout}) {
+                    $template->{timeout} = $self->cfg->{timeout};
+                } elsif ($template->{timeout} <= 0) {
+                    $self->log->fatal("invalid timeout for '$name'($driver): $template->{timeout}");
                 }
 
-                Breeze::Module->new($modcfg, {
+                Breeze::Module->new($name, $template, {
                     log         => $self->log,
                     theme       => $self->theme,
                     timeouts    => $self->cfg->{timeouts},
@@ -142,9 +145,9 @@ sub init_modules($self) {
             } catch {
                 $self->log->error("failed to instantiate '$name'($driver)");
                 $self->log->error($_);
+                undef;
             };
 
-            my $error_msg = $_;
             # if module failed
             if (!defined $inst) {
                 # if it was Leaf::Fail, there is nothing else to do
@@ -155,9 +158,10 @@ sub init_modules($self) {
                 $self->log->info("replacing  with failed placeholder");
 
                 $modcfg = {
-                    -name   => "__failed_" . $self->{mods}->$#*,
-                    -driver => "Leaf::Fail",
-                    text    => "'$name'($driver)",
+                    "__failed_" . $self->{mods}->$#* => {
+                        driver => "Leaf::Fail",
+                        text    => "'$name'($driver)",
+                    }
                 };
 
                 redo;
@@ -165,6 +169,16 @@ sub init_modules($self) {
 
             push $self->{mods}->@*, $inst;
             $self->{mods_by_name}->{$name} = $inst;
+        } else {
+            $self->log->error("invalid syntax in configuration file");
+            $modcfg = {
+                "__invalid_" . $self->{mods}->$#* => {
+                    driver  => "Leaf::Fail",
+                    text    => "check config",
+                },
+            };
+
+            redo;
         }
     }
 }
@@ -454,8 +468,6 @@ sub process_event($self, $mod, $data) {
 }
 
 sub event($self, $event) {
-    use Data::Dumper;
-
     my $target = $event->{instance};
     my $mod    = $self->mod($target);
 

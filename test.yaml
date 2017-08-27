@@ -12,7 +12,7 @@ logfile: "/tmp/breeze.log"
 # Turn debugging on or off.
 #
 # Values: (yes|no)
-debug: yes
+debug: no
 
 # Show performance component in the first position. Usually useful only
 # for debugging.
@@ -89,77 +89,77 @@ alternate:          "%{bg2,darkgray,darkgrey,gray,grey}"
 modules:
     # leading separator
     - separator
-    - -name:        spotify
-      -driver:      Leaf::Spotify
-      -timeout:     1
+    - spotify:
+        driver:         Leaf::Spotify
+        timeout:        1
     - separator
-    - -name:        cpu
-      -driver:      Leaf::ArchCPU
-      -refresh:     1
-      warning:      80
-      critical:     90
-    - -name:        memory
-      -driver:      Leaf::MemInfo
-      -refresh:     5
-      warning:      80
-      critical:     90
-      unit:         MB
-      switch:       4
-      valfmt:       %4d
-      display:
-          - icon:   
-            format: "%{MemUsed}/%{MemTotal} %{Unit} (%{MemUsedPercent}%)"
-            watch:  "MemUsedPercent"
-            more:   worse
-          - icon:   
-            format: "%{SwapUsed}/%{SwapTotal} %{Unit} (%{SwapUsedPercent}%)"
-            watch:  "SwapUsedPercent"
-            more:   worse
+    - cpu:
+        driver:         Leaf::ArchCPU
+        refresh:        1
+        warning:        80
+        critical:       90
+    - memory:
+        driver:         Leaf::MemInfo
+        refresh:        5
+        warning:        80
+        critical:       90
+        unit:           MB
+        switch:         4
+        valfmt:         "%4d"
+        display:
+            -   icon:   
+                format: "%{MemUsed}/%{MemTotal} %{Unit} (%{MemUsedPercent}%)"
+                watch:  "MemUsedPercent"
+                more:   worse
+            -   icon:   
+                format: "%{SwapUsed}/%{SwapTotal} %{Unit} (%{SwapUsedPercent}%)"
+                watch:  "SwapUsedPercent"
+                more:   worse
     - separator
-    - -name:        keyboard
-      -driver:      Leaf::CustomCommand
-      icon:         
-      color:        '%{keyboard.color,cyan}'
-      invert_on_change: 0
-      commands:
-          [ xkb-switch ]
-      events:
-          left_click:   [ xkb-switch, -n ]
-    - -name:        led-numlk
-      -driver:      Leaf::LED
-      key:          NumLock
-      text:         NumLk
-      watch_state:  1
-    - -name:        led-capslk
-      -driver:      Leaf::LED
-      key:          CapsLock
-      text:         CapsLk
-      watch_state:  0
+    - keyboard:
+        driver:         Leaf::CustomCommand
+        icon:           
+        color:          '%{keyboard.color,cyan}'
+        invert_on_change:   0
+        commands:
+            [ xkb-switch ]
+        events:
+            left_click:   [ xkb-switch, -n ]
+    - led-numlk:
+        driver:         Leaf::LED
+        key:            NumLock
+        text:           NumLk
+        watch_state:    1
+    - led-capslk:
+        driver:         Leaf::LED
+        key:            CapsLock
+        text:           CapsLk
+        watch_state:    0
     - separator
-    - -name:        backlight
-      -driver:      Leaf::Backlight
-      -timeout:     2
-      video:        intel_backlight
-    - -name:        volume
-      -driver:      Leaf::PAMixer
-      -refresh:     0
-      sink:         alsa_output.pci-0000_00_1f.3.analog-stereo
-      allow-boost:  yes
-      step:         2
+    - backlight:
+        driver:         Leaf::Backlight
+        timeout:        2
+        video:          intel_backlight
+    - volume:
+        driver:         Leaf::PAMixer
+        refresh:        0
+        sink:           alsa_output.pci-0000_00_1f.3.analog-stereo
+        allow-boost:    yes
+        step:           2
     - separator
-    - -name:        wifi
-      -driver:      Leaf::IPAddr
-      device:       wlp1s0
-      icon:         
-    - -name:        ethernet
-      -driver:      Leaf::IPAddr
-      device:       enp0s31f6
-      icon:         
+    - wifi:
+        driver:         Leaf::IPAddr
+        device:         wlp1s0
+        icon:           
+    - ethernet:
+        driver:         Leaf::IPAddr
+        device:         enp0s31f6
+        icon:           
     - separator
-    - -name:        time
-      -driver:      Leaf::Time
-      -refresh:     0
-      format:       "%a %y-%m-%d %H:%M:%S"
-      icon:         %utf8{ef809720}
+    - time:
+        driver:         Leaf::Time
+        refresh:        0
+        format:         "%a %y-%m-%d %H:%M:%S"
+        icon:           
     # add trailing separator
     - separator
