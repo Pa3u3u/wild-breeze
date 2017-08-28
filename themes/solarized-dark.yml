@@ -1,0 +1,39 @@
+# source: http://simianuprising.com/wp-content/uploads/2012/08/solarized-reference-horizontal.png
+
+black:      $002b36
+gray:       $586e75
+silver:     $93a1a1
+white:      $fdf6e3
+
+red:        $dc322f
+green:      $859900
+blue:       $268bd2
+magenta:    $d33682
+yellow:     $b58900
+cyan:       $2aa198
+
+orange:     $cb4b16
+violet:     $6c71c4
+
+# specials
+bg1:        $002b36
+bg2:        $073642
+
+# gradients
+backlight.@grad:
+    aluminum
+    white
+
+meminfo.@worse:
+    green
+    green
+    green
+    yellow
+    red
+
+meminfo.@better:
+    red
+    yellow
+    green
+    green
+    green
