@@ -35,6 +35,8 @@ sub new($class, %args) {
 }
 
 sub get_login($self) {
+    $self->{muttrc} =~ s/%\{HOME\}/$ENV{HOME}/g;
+
     open my $mfh, "<:encoding(utf-8)", $self->{muttrc}
         or $self->log->fatal("$self->{muttrc}: $!");
 
@@ -94,7 +96,7 @@ sub invoke($self) {
         delete $self->{job};
         return {
             text    => "$self->{last}?",
-            icon    => "",
+            icon    => "",
             color   => "%{imapunread.error,orange,red}",
             cache   => $self->{check},
         };
@@ -107,7 +109,7 @@ sub invoke($self) {
         $self->log->error("failed to obtain result from child: ", ($result // "<undef>"));
         return {
             text    => "$self->{last}?",
-            icon    => "",
+            icon    => "",
             color   => "%{imapunread.error,orange,red}",
             cache   => $self->{check},
         };
@@ -128,7 +130,7 @@ sub invoke($self) {
 
     my $ret = {
         text    => "$count",
-        icon    => "",
+        icon    => "",
         cache   => $self->{check},
     };
 
