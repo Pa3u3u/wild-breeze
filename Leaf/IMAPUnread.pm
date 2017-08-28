@@ -140,7 +140,6 @@ sub invoke($self) {
     } elsif ($count > 0) {
         $ret->{color} = "%{imapunread.unread,silver}";
     } else {
-        delete $ret->{text};
         $ret->{color} = "%{imapunread.nomail,gray}";
     }
 
