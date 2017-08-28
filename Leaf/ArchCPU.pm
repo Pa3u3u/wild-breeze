@@ -95,12 +95,12 @@ sub invoke($self) {
 
 sub refresh_on_event($) { 1; }
 
-sub on_wheel_up($self) {
+sub on_next($self) {
     delete $self->{prev};
     ++$self->{step};
 }
 
-sub on_wheel_down($self) {
+sub on_back($self) {
     delete $self->{prev};
     --$self->{step};
 }
