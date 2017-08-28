@@ -109,7 +109,15 @@ sub init_logger($self) {
 
 sub init_modules($self) {
     $self->{mods} = [];
-    $self->{mods_by_name} = {};
+    $self->{mods_by_name} = {
+        # fallback module
+        __zero => Breeze::Module->new("__zero", { driver => "Stalk::Driver" }, {
+            log         => $self->log,
+            theme       => $self->theme,
+            timeouts    => 0,
+            failures    => 0,
+        }),
+    };
 
     # stack modules in reverse order, first module will be added to
     # the list as the last
@@ -209,11 +217,13 @@ sub fail_module($self, $module, $timer) {
     } else {
         # temporarily disable module
         return {
-            text    => $module->name_canon,
-            blink   => $self->cfg->{cooldown},
-            cache   => $self->cfg->{cooldown},
-            background  => "%{core.fail.bg,orange,yellow",
-            color       => "%{core.fail.fg,fg,white}",
+            name        => "__zero",
+            instance    => $module->name,
+            text        => $module->name_canon,
+            blink       => $self->cfg->{cooldown},
+            cache       => $self->cfg->{cooldown},
+            background  => "%{core.fail.bg,bg,black}",
+            color       => "%{core.fail.fg,fg,orange,yellow}",
             icon        => ($timer eq "fail" ? "" : ""),
         };
     }
@@ -268,33 +278,34 @@ sub run($self) {
 
 sub post_process_seg($self, $ret) {
     my $alt = 0;
-    foreach my $data (@$ret) {
+    foreach my $seg (@$ret) {
         # skip separators
-        if (exists $data->{separator}) {
+        if (exists $seg->{separator}) {
             ++$alt;
             next;
         }
 
         # add defaults
         while (my ($k, $v) = each $self->cfg->{defaults}->%*) {
-            next if exists $data->{$k} || !defined $v;
+            next if exists $seg->{$k} || !defined $v;
 
-            $data->{$k} = ($k eq "background" && ($alt % 2 == 1) && defined $self->cfg->{alternate})
-                        ? $self->cfg->{alternate}
-                        : $v;
+            $seg->{$k} = ($k eq "background" && ($alt % 2 == 1)
+                    && defined $self->cfg->{alternate})
+                ? $self->cfg->{alternate}
+                : $v;
         }
 
         # resolve colors if required
         foreach my $k (qw(color background border)) {
-            next if !defined $data->{$k};
-            $data->{$k} = $self->theme->resolve($data->{$k}) // $self->cfg->{defaults}->{$k};
+            next if !defined $seg->{$k};
+            $seg->{$k} = $self->theme->resolve($seg->{$k}) // $self->cfg->{defaults}->{$k};
         }
 
         # combine text, icon into full_text
-        if (defined $data->{text} && defined $data->{icon}) {
-            $data->{full_text} = join " ", $data->{icon}, $data->{text};
-        } elsif (defined $data->{text} || defined $data->{icon}) {
-            $data->{full_text} = join "", ($data->{icon} // ""), ($data->{text} // "");
+        if (defined $seg->{text} && defined $seg->{icon}) {
+            $seg->{full_text} = join " ", $seg->{icon}, $seg->{text};
+        } elsif (defined $seg->{text} || defined $seg->{icon}) {
+            $seg->{full_text} = join "", ($seg->{icon} // ""), ($seg->{text} // "");
         }
     }
 }

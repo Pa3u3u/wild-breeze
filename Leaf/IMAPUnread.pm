@@ -55,7 +55,7 @@ sub get_login($self) {
 
         if ($line =~ m/\bimap_pass\b/) {
             ($pass) = ($line =~ m/imap_pass\s*=\s*["'](.*)["']/);
-    
+
             if (!$pass) {
                 $self->log->fatal("$self->{muttrc}:$.: failed to read imap_pass\n");
             }
