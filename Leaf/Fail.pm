@@ -16,7 +16,7 @@ sub new($class, %args) {
         unless defined $args{text};
 
     $self->{text}   = $args{text};
-    $self->{first}  = 1;
+    $self->{tc}     = 0;
     return $self;
 }
 
@@ -30,14 +30,16 @@ sub invoke($self) {
         cache   => "+inf",
     };
 
-    if ($self->{first}) {
+    if ($self->{tc} == 0) {
         $ret->{blink}       = 30;
         $ret->{invert}      = "+inf";
-        $self->{first}      = 0;
-    } else {
+    } elsif ($self->{tc} == 1) {
         $ret->{reset_all} = 1;
+    } else {
+        delete $ret->{text};
     }
 
+    ++$self->{tc};
     return $ret;
 }
 
