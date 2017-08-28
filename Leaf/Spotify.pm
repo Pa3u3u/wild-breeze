@@ -139,7 +139,7 @@ sub invoke {
         color       => $c,
     };
 
-    $ret->{invert} = 0;
+    $ret->{invert} = 0 if $data->{status} eq "Playing";
     return $ret;
 }
 
