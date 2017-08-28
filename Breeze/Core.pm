@@ -408,8 +408,7 @@ sub post_process_attr($self, $ret) {
         # add padding if requested
         if ($self->cfg->{padding} && $seg->{name} !~ m/^__separator_/) {
             my $pad = " " x $self->cfg->{padding};
-            $seg->{full_text} =~ s/^(\S)/$pad$1/;
-            $seg->{full_text} =~ s/(\S)$/$1$pad/;
+            $seg->{full_text} = $pad . $seg->{full_text} . $pad;
         }
 
         # remove i3status separator
