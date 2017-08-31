@@ -1,31 +1,25 @@
 #!/usr/bin/perl
 
-use v5.26;
 use utf8;
 use strict;
 use warnings;
 
-use FindBin     qw($Bin);
-use lib         "$Bin";
-
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
-
-use PerlIO;
-use Data::Dumper;
-
-use Breeze::Core;
-use Breeze::I3;
 use Carp;
 use File::Slurp;
+use FindBin     qw($Bin);
 use Getopt::Long    qw(:config bundling);
-use JSON::XS;
 use Pod::Usage;
 use IO::Handle;
 use IO::Select;
 use Try::Tiny;
 use YAML::Syck;
+
+use lib "$Bin";
+use Breeze::Core;
+use Breeze::I3;
 
 #-------------------------------------------------------------------------------
 # Configuration
@@ -67,8 +61,11 @@ my $defaults = {
 
 my $options  = {};
 
-GetOptions($options, qw(man|help h theme=s))
+GetOptions($options, qw(man|help h theme=s debug|d stderr|e))
     or pod2usage({ -exitval => 1, -verbose => 1 });
+
+pod2usage({ -exitval => 0, verbose => 1 }) if $options->{h};
+pod2usage({ -exitval => 0, verbose => 2 }) if $options->{man};
 
 if (@ARGV == 1) {
     $options->{conf} = $ARGV[0];
@@ -82,17 +79,23 @@ my $config_file = $options->{conf}  // $defaults->{conf};
 $config_file = "$Bin/$config_file" if $config_file !~ m!^/!;
 my $config = read_config($config_file);
 
+# modify config according to some options
+$config->{theme}    = $options->{theme} if defined $options->{theme};
+$config->{debug}    = $options->{debug} if $options->{debug};
+$config->{logfile}  = "%STDERR" if $options->{stderr};
+
 # read theme
 my $theme_file = $options->{theme} // $config->{theme} // $defaults->{theme};
 $theme_file = "$Bin/$theme_file" if $theme_file !~ m!^/!;
 my $theme  = read_config($theme_file);
 
-# set up JSON event parser
-my $ev_parser   = JSON::XS->new->utf8(0);
-my $ev_started  = 0;
+# set up I3 output
+my $i3 = Breeze::I3->new();
 
-# set up Breeze and I3 stuff
-my $i3     = Breeze::I3->new();
+$i3->start;
+$i3->init_msg("starting wild-breeze");
+
+# initialize the core
 my $breeze = Breeze::Core->new($config, $theme);
 my $log    = $breeze->log->clone(category => "wild-breeze");
 
@@ -105,9 +108,6 @@ my $select = IO::Select->new(*STDIN)
 # turn off buffering
 STDOUT->autoflush(1);
 STDERR->autoflush(1);
-
-# let's roll
-$i3->start;
 
 # enter the main loop
 MAIN_LOOP:
@@ -127,33 +127,115 @@ while (1) {
     # wait for an event, at most a second by default
     foreach my $hndl ($select->can_read($config->{tick} // 1)) {
         my $ev_data;
-        last unless sysread $hndl, $ev_data, 4096;
 
-        # decode data
-        utf8::decode($ev_data);
-
-        # add data to parser
-        $ev_parser->incr_parse($ev_data);
-
-        # first, get rid of leading '['
-        if (!$ev_started && $ev_parser->incr_text =~ s/^\s*\[//) {
-            $ev_started = 1;
-        } elsif (!$ev_started) {
-            next;
-        }
-
-        # exit if we encounter ']'
-        if ($ev_parser->incr_text =~ s/^\s*\]//) {
+        if (!sysread $hndl, $ev_data, 4096) {
+            $log->debug("input stream ended prematurely");
             last MAIN_LOOP;
         }
 
-        # remove separators and process events
-        $ev_parser->incr_text =~ s/^\s*,//;
-        while (my $event = $ev_parser->incr_parse) {
+        # decode data and feed it to i3
+        utf8::decode($ev_data);
+        next unless $i3->input($ev_data);
+
+        # process all created events
+        while (my $event = $i3->next_event) {
             $breeze->event($event);
-            $ev_parser->incr_text =~ s/^\s*,//;
         }
     }
 }
 
-# vim: syntax=perl5-24
+# done
+$i3->stop;
+exit 0;
+
+__END__
+
+=head1 NAME
+
+    wild-breeze -- i3status extensible replacement
+
+=head1 SYNOPSIS
+
+    wild-breeze [OPTIONS] [CONFIG_FILE]
+
+=head1 OPTIONS AND ARGUMENTS
+
+=over
+
+=item C<-h>
+
+Show brief help.
+
+=item C<--man>,C<--help>
+
+Show perlpod page.
+
+=item C<--theme=FILE>
+
+Path to theme to use.
+This is only useful for testing, as the theme file should be specified
+in the configuration file:
+
+    theme: path-to-theme
+
+=item C<-d>,C<--debug>
+
+Turn on debugging messages. Overrides the configuration file.
+
+=item C<-e>,C<--stderr>
+
+Log to stderr. Overrides the configuration file.
+
+=item CONFIG_FILE
+
+Configuration file. If not specified, the default C<~/.config/i3/breeze.yml>
+will be used instead.
+
+=back
+
+=head1 DESCRIPTION
+
+Wild breeze is a replacement of i3status that offers easy extensibility
+with modules (called B<leaves>).
+
+=head2 Setup
+
+Create a configuration file somewhere (e.g. C<~/.config/i3/breeze.yml>.
+The file is written in L<YAML|https://docs.ansible.com/ansible/latest/YAMLSyntax.html>.
+There should be an example configuration included with this program with
+all configuration options explained.
+
+Then, edit your i3bar configuration (usually in C<~/.config/i3/config> so
+it says something similar to:
+
+    bar {
+        # font configuration
+        path-to-wild-breeze path-to-config
+    }
+
+=head2 More information
+
+Please see the project's wiki for more information about leaves and the program.
+
+=head2 Troubleshooting (in general)
+
+=over
+
+=item make sure you installed I<all> required dependencies.
+
+=item enable logging with debug to see what's going on
+
+In config file:
+
+    # $$ will be replaced by the PID
+    logfile: /tmp/breeze.$$.log
+    debug: yes
+
+=item try running the program from command line to see if output makes sense, e.g.
+
+    path-to-wild-breeze --stderr --debug path-to-config </dev/null
+
+Redirecting the stdin to C</dev/null> will cause the program to run one iteration
+only and end immediately.
+
+=back

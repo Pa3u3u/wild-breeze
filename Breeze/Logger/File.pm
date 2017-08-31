@@ -12,6 +12,20 @@ use Carp;
 use IO::Handle;
 use Time::Format    qw(%strftime);
 
+=head1 NAME
+
+    Breeze::Logger::File -- log to file
+
+=head1 DESCRIPTION
+
+Logs messages to a file specified in the constructor as the
+C<filename> parameter.
+
+The C</debug> method is enabled only if the C<< debug => 1 >> parameter
+was passed to the constructor.
+
+=cut
+
 sub new($class, @args) {
     my $self = $class->SUPER::new(@args);
 
@@ -45,7 +59,5 @@ sub debug($self, @msg) {
     printf { $self->{fh} } "%s debg[%s] %s\n",
         $self->time, $self->{category}, join("", @msg);
 }
-
-# vim: syntax=perl5-24
 
 1;

@@ -1,6 +1,5 @@
 package Leaf::MemInfo;
 
-use v5.26;
 use utf8;
 use strict;
 use warnings;
@@ -11,7 +10,6 @@ no  warnings    qw(experimental::signatures);
 
 use Breeze::Counter;
 use Breeze::Grad;
-use Data::Dumper;
 use Linux::MemInfo;
 
 sub new($class, %args) {
@@ -25,13 +23,13 @@ sub new($class, %args) {
         {
             icon    => "",
             format  => '%{MemUsed}/%{MemTotal} (%{MemUsedPercent})',
-            style   => "MemUsedPercent",
+            watch   => "MemUsedPercent",
             more    => "worse",
         },
         {
             icon    => "",
             format  => '%{SwapUsed}/%{SwapTotal} (%{SwapUsedPercent})',
-            style   => "SwapUsedPercent",
+            watch   => "SwapUsedPercent",
             more    => "worse",
         },
     ];
@@ -117,14 +115,14 @@ sub invoke($self) {
     }
 
     my $watch = $data{$fmt->{watch}};
-    my $color = $fmt->{more} eq "better"
-        ? $self->theme->grad($watch, '%{meminfo.@better,@red-to-green,red yellow green}')
-        : $self->theme->grad($watch, '%{meminfo.@worse,@green-to-red,green yellow red}');
+    my $gradient = $fmt->{more} eq "better"
+        ? '%{meminfo.@better,@red-to-green,red yellow green}'
+        : '%{meminfo.@worse,@green-to-red,green yellow red}';
 
     my $ret = {
-        icon    => $fmt->{icon},
-        text    => $str,
-        color   => $color,
+        icon        => $fmt->{icon},
+        text        => $str,
+        color_grad  => [ $watch, $gradient ],
         reset_all   => 1,
     };
 
@@ -158,7 +156,5 @@ sub on_back($self) {
     --$self->{step};
     return { reset_all => 1 };
 }
-
-# vim: syntax=perl5-24
 
 1;

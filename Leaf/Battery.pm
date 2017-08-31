@@ -35,7 +35,6 @@ sub invoke($self) {
 
     chomp ($max, $current, $state);
     my $p = int (100 * $current / $max);
-    my $color = $self->theme->grad($p, '%{battery.@grad,@red-to-green,red yellow green}');
 
     my $icon = lc $state eq "charging" ? ""
              : $p >= 80 ? ""
@@ -45,10 +44,12 @@ sub invoke($self) {
              : "";
 
     my $ret = {
-        text    => sprintf("%3d%%", $p),
-        icon    => $icon,
-        color   => $color,
+        text        => sprintf("%3d%%", $p),
+        icon        => $icon,
+        color_grad  => [ $p, '%{battery.@grad,@red-to-green,red yellow green}' ],
     };
+
+    return $ret if lc $state eq "charging";
 
     if ($p < $self->{critical}) {
         $ret->{blink} = $self->refresh;

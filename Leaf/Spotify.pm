@@ -1,6 +1,5 @@
 package Leaf::Spotify;
 
-use v5.26;
 use utf8;
 use strict;
 use warnings;
@@ -72,7 +71,7 @@ sub show_title {
 
     my $title = $meta->{"xesam:title"};
     utf8::decode($title);
-    return ("", "(" . $self->wfix($title, 33) . ")");
+    return ("", $self->wfix($title, 33));
 }
 
 sub show_artist {
@@ -80,7 +79,7 @@ sub show_artist {
 
     my $artist = join ", ", $meta->{"xesam:artist"}->@*;
     utf8::decode($artist);
-    return ("", "(" . $self->wfix($artist, 33). ")");
+    return ("", $self->wfix($artist, 33));
 }
 
 sub show_album {
@@ -88,7 +87,7 @@ sub show_album {
 
     my $album = join ", ", $meta->{"xesam:album"};
     utf8::decode($album);
-    return ("", "(" . $self->wfix($album, 33) . ")");
+    return ("", $self->wfix($album, 33));
 }
 
 sub invoke {
@@ -177,7 +176,5 @@ sub on_next($self) {
 
     $sp->Previous;
 }
-
-# vim: syntax=perl5-24
 
 1;

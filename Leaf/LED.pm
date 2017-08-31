@@ -1,6 +1,5 @@
 package Leaf::LED;
 
-use v5.26;
 use utf8;
 use strict;
 use warnings;
@@ -42,7 +41,8 @@ sub invoke($self) {
 
     my $status = hex $mask;
     my $code   = ($status & (1 << $keys{$self->{key}}));
-    my $color  = $code ? "%{led.on,green}" : "%{led.off,red}";
+    my $color  = $code ? "%{led.$self->{key}.on,led.on,green}"
+                       : "%{led.$self->{key}.off,led.off,aluminum,gray}";
 
     my $ret = {
         icon    => $self->{icon},
@@ -56,7 +56,5 @@ sub invoke($self) {
 
     return $ret;
 }
-
-# vim: syntax=perl5-24
 
 1;

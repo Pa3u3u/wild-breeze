@@ -19,7 +19,11 @@ bg1:        black
 bg2:        $404443
 aluminum:   $888a85
 
-spotify.playing:   green
+spotify.playing:    green
+
+# leds
+led.CapsLock.on:    orange
+led.NumLock.off:    red
 
 # gradients
 backlight.@grad:

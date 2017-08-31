@@ -1,6 +1,5 @@
 package Leaf::PAMixer;
 
-use v5.26;
 use utf8;
 use strict;
 use warnings;
@@ -62,9 +61,11 @@ sub invoke($self) {
         $ret->{color}       = '%{volume.muted.fg,black}';
         $ret->{background}  = '%{volume.muted.bg,silver}';
     } else {
-        $ret->{color} = $volume > 100
-            ? "%{volume.overmax,cyan}"
-            : $self->theme->grad($volume, '%{volume.@grad,@red-to-green,red yellow green}');
+        if ($volume > 100) {
+            $ret->{color} = '%{volume.overmax,cyan}';
+        } else {
+            $ret->{color_grad} = [ $volume, '%{volume.@grad,@red-to-green,red yellow green}' ];
+        }
 
         if (($self->{last} // $volume) != $volume) {
             $ret->{invert} = 1;
@@ -107,7 +108,5 @@ sub on_wheel_down($self) {
     $self->run_pamixer(@args);
     return { reset_all => 1, invert => 1 };
 }
-
-# vim: syntax=perl5-24
 
 1;

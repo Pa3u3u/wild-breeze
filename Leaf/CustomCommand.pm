@@ -19,7 +19,12 @@ sub new($class, %args) {
         unless defined $self->{commands} && $self->{commands}->@* >= 1;
 
     if ($self->{commands}->@* >= 2) {
-        $self->{ix} = Breeze::Counter->fixed($self->{commands}->@*);
+        $self->{ix} = Breeze::Counter->fixed(scalar $self->{commands}->@*);
+    }
+
+    # change scalar commands to arrays
+    foreach my $cmd ($self->{commands}->@*) {
+        $cmd = [ split / /, $cmd ] unless ref $cmd eq "ARRAY";
     }
 
     return $self;
@@ -54,6 +59,8 @@ sub proc_event($self, $e) {
     return unless defined $self->{events};
 
     my $cmd = $self->{events}->{$e};
+
+    $cmd = [ split / /, $cmd ] unless ref $cmd eq "ARRAY";
     return unless defined $cmd;
 
     $self->run_command($cmd, stderr_fatal => 1, status_fatal => 1);
@@ -73,7 +80,5 @@ sub on_next($s) {
     ++$s->{ix} if defined $s->{ix};
     undef;
 }
-
-# vim: syntax=perl5-24
 
 1;

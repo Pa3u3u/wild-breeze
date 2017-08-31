@@ -1,6 +1,5 @@
 package Leaf::IMAPUnread;
 
-use v5.26;
 use utf8;
 use strict;
 use warnings;

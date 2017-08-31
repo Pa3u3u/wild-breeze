@@ -42,13 +42,13 @@ sub invoke($self, %args) {
         $new = "DOWN,0";
     } elsif ($header =~m/\bstate UP/) {
         my @addrlines = grep { /\bscope global\b/ } (@lines);
+        my @addresses = map { /\binet6?\s+([\da-f:.]+)\// } @addrlines;
 
         if (!@addrlines) {
             $ret->{color} = "%{ipaddr.no_ip,orange,yellow}";
             $ret->{text}  = "no IP";
             $new = "UP,0";
         } else {
-            my @addresses = map { /\binet6?\s+([\da-f:.]+)\// } @addrlines;
             $ret->{color} = "%{ipaddr.up,green}";
             $ret->{text}  = "UP";
             $new = "UP," . scalar(@addresses);
@@ -69,8 +69,8 @@ sub invoke($self, %args) {
         $new = "UNKNOWN,0";
     }
 
-    if ($self->{last} ne $new && $self->{last} ne "INIT") {
-        $ret->{invert} = 2;
+    if ($self->{last} ne $new && $self->{last} ne "INIT" && defined $self->{invert_on_change}) {
+        $ret->{invert} = $self->{invert_on_change};
     }
 
     $self->{last} = $new;

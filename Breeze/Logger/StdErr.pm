@@ -12,6 +12,19 @@ use Carp;
 use Time::Format    qw(%strftime);
 use Term::ANSIColor;
 
+=head1 NAME
+
+    Breeze::Logger::StdErr -- log to stderr
+
+=head1 DESCRIPTION
+
+Logs messages to the standard output.
+
+The C</debug> method is enabled only if the C<< debug => 1 >> parameter
+was passed to the constructor.
+
+=cut
+
 sub new($class, @args) {
     my $self = $class->SUPER::new(@args);
 
@@ -48,7 +61,5 @@ sub debug($self, @msg) {
         $self->{category},
         colored(join("", @msg), "ansi242");
 }
-
-# vim: syntax=perl5-24
 
 1;

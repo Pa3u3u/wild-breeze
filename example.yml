@@ -1,0 +1,98 @@
+# Log file location. The filename can contain '$$' which will be replaced
+# by the PID of the program.
+#
+# Values:
+#   - string      write to a file
+#   - %STDERR     write to stderr
+#   - null        disable logging entirely
+#logfile: "/tmp/breeze.log"
+#logfile: %STDERR
+logfile: null
+
+# Turn debugging on or off.
+#
+# Values: (yes|no)
+debug: no
+
+# A duration between 'ticks'. All intervals here are 'ticks'. If this
+# value is set to 1 (as it should be), all ticks are roughly equivalent
+# to seconds.
+#
+# Values: positive integers
+tick: 1
+
+# Number of seconds available for a module to generate its output when invoked..
+# This value is used with Time::HiRes, so it can be a fractional number.
+#
+# Values: positive fractionals
+timeout: 0.5
+
+# Number of timeouts before the module is disabled entirely. This should be
+# at least 1, otherwise all modules would have to be disabled instantly.
+#
+# Values: positive integers
+timeouts: 10
+
+# Number of failures a module can cause, either by running 'invoke' or
+# an event handler. After that, the module is disabled.
+#
+# Values: positive integers
+failures: 10
+
+# Number of ticks to wait after trying to invoke module again. Until then,
+# a warning component will be displayed instead.
+#
+# Values: positive integers
+cooldown: 5
+
+# Spaces to add around text entries.
+#
+# Values: non-negative integers
+padding: 1
+
+# An icon to use as a separator. The foreground of a separator will be
+# copied from the "next" (right) component, the background will be copied
+# from the "previous" (left) component.
+#
+# You can use separators in module definitions simply as keys without values:
+#
+# modules:
+#     # ...
+#     - separator
+#     # ...
+#
+# Value: string
+separator: 
+
+# File to load with color theme. If it does not begin with '/', will be
+# searched for in the directory with the 'wild-breeze' script.
+#
+# Value: path
+#theme: "themes/default.yml"
+theme: "themes/tango.yml"
+
+# Default values for output entry.
+defaults:
+    background:     "%{bg1,black}"
+    color:          "%{fg,white}"
+#   do NOT use border, it looks awful with custom separators
+    border:         null
+#   the following two will be _always_ set up by wind-breeze.
+#   separator:              no
+#   separator_block_width:  0
+
+# If defined, uses this color instead of default background in alternating
+# fashion.
+#
+# Values: colors or null
+alternate:          "%{bg2,darkgray,darkgrey,gray,grey}"
+
+# Module descriptions. The following modules will be displayed from left
+# to right as they appear in this array of objects.
+modules:
+    # leading separator
+    - separator
+    - time:
+        driver:         Leaf::Time
+    # add trailing separator
+    - separator

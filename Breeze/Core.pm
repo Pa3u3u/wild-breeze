@@ -1,6 +1,5 @@
 package Breeze::Core;
 
-use v5.26;
 use utf8;
 use strict;
 use warnings;
@@ -9,8 +8,7 @@ use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
 use Carp;
-use Data::Dumper;
-use JSON::XS;
+use JSON;
 use Time::HiRes;
 use Time::Out   qw(timeout);
 use Try::Tiny;
@@ -18,12 +16,55 @@ use Try::Tiny;
 # Wild Breeze modules
 use Breeze::Cache;
 use Breeze::Counter;
-use Breeze::Instances;
 use Breeze::Logger;
 use Breeze::Logger::File;
 use Breeze::Logger::StdErr;
+use Breeze::Module;
+use Breeze::Separator;
 use Breeze::Theme;
-use Leaf::Fail;
+use Stalk::Fail;
+
+=head1 NAME
+
+    Breeze::Core -- Implements main functionality of wild-breeze
+
+=head1 DESCRIPTION
+
+=head2 Methods
+
+=over
+
+=item C< new($class, $config, $theme) >
+
+Creates a new instance of the Core. In the process, it
+
+=over
+
+=item validates the configuration
+
+=item initializes loggers
+
+=item initializes theme
+
+=item constructs modules described in the configuration
+
+=back
+
+Required arguments are:
+
+=over
+
+=item C<$config>
+
+parsed configuration file contents as hashref
+
+=item C<$theme>
+
+parsed theme file contents as hashref
+
+=back
+
+=cut
 
 sub new($class, $config, $theme) {
     my $self = {
@@ -46,24 +87,66 @@ sub new($class, $config, $theme) {
     $self->init_modules;
     $self->init_events;
 
-    $self->cache->set_logger($self->log->clone(category => "Breeze::Cache"));
+    $self->cache->log($self->log->clone(category => "Breeze::Cache"));
 
     return $self;
 }
 
-# getters
+=item C<< $core->ticks >>
+
+Returns a I<reference> to the internal L<Breeze::Counter> instance.
+This counter keeps track of ticks passed since start.
+
+=cut
+
+sub ticks($self)    { \$self->{ticks}; }
+
+=item C<< $core->cfg >>
+
+=item C<< $core->theme >>
+
+=item C<< $core->log >>
+
+=item C<< $core->cache >>
+
+=item C<< $core->mods >>
+
+Getters that return configuration, theme, logger instance, cache instance
+and all modules, respectively.
+
+=cut
+
 sub cfg($self)      { $self->{config}; }
+sub theme($self)    { $self->{theme};  }
 sub log($self)      { $self->{logger}; }
 sub cache($self)    { $self->{cache};  }
-sub ticks($self)    { \$self->{ticks}; }
-sub theme($self)    { $self->{theme};  }
 sub mods($self)     { $self->{mods};   }
+
+=item C<< $core->mod($name) >>
+
+Returns a L<Breeze::Module> instance with the given name or C<undef> if
+no such module exists.
+
+=cut
 
 sub mod($self, $name) {
     return $self->{mods_by_name}->{$name};
 }
 
-# primitive validate configuration
+=back
+
+=head2 Initializers (internal)
+
+You are not supposed to call these methods directly.
+
+=over
+
+=item C<< $core->validate >>
+
+Validates the configuration. Croaks if it finds errors.
+
+=cut
+
 sub validate($self) {
     croak "timeout is not greater than zero"
         unless $self->cfg->{timeout} > 0;
@@ -75,14 +158,23 @@ sub validate($self) {
         unless $self->cfg->{cooldown} > 0;
 }
 
-# replace utf8 hardcoded string
+=item C<< $core->u8($string) >>
+
+Constructs a utf-8 string from a hex string ([0-9a-zA-Z]+).
+
+=cut
+
 sub u8($self, $what) {
     my $t = join("", map { chr(hex) } ($what =~ m/../g));
     utf8::decode($t);
     return $t;
 }
 
-# initializers
+=item C<< $core->resolve_defaults >>
+
+Resolves default colors in the configuration.
+
+=cut
 
 sub resolve_defaults($self) {
     foreach (qw(color background border)) {
@@ -91,6 +183,12 @@ sub resolve_defaults($self) {
             if defined $$ref;
     }
 }
+
+=item C<< $core->init_logger >>
+
+Initializes the logger as set in the configuration.
+
+=cut
 
 sub init_logger($self) {
     my $f = $self->cfg->{logfile};
@@ -106,6 +204,14 @@ sub init_logger($self) {
         $self->{logger} = Breeze::Logger::File->new($c, filename => $f, %a);
     }
 }
+
+=item C<< $core->init_modules >>
+
+Instantiates all modules described by the configuration file.
+If the instantiation of a module fails, it gets replaced by L<Stalk::Fail>.
+Note that if L<Stalk::Fail> itself fails, the class will intentionally croak.
+
+=cut
 
 sub init_modules($self) {
     $self->{mods} = [];
@@ -159,16 +265,16 @@ sub init_modules($self) {
 
             # if module failed
             if (!defined $inst) {
-                # if it was Leaf::Fail, there is nothing else to do
-                if ($driver eq "Leaf::Fail") {
-                    $self->log->fatal("Leaf::Fail failed, something's gone terribly wrong");
+                # if it was Stalk::Fail, there is nothing else to do
+                if ($driver eq "Stalk::Fail") {
+                    $self->log->fatal("Stalk::Fail failed, something's gone terribly wrong");
                 }
 
                 $self->log->info("replacing  with failed placeholder");
 
                 $modcfg = {
                     "__failed_" . $self->{mods}->$#* => {
-                        driver => "Leaf::Fail",
+                        driver => "Stalk::Fail",
                         text    => "'$name'($driver)",
                     }
                 };
@@ -182,7 +288,7 @@ sub init_modules($self) {
             $self->log->error("invalid syntax in configuration file");
             $modcfg = {
                 "__invalid_" . $self->{mods}->$#* => {
-                    driver  => "Leaf::Fail",
+                    driver  => "Stalk::Fail",
                     text    => "check config",
                 },
             };
@@ -191,6 +297,12 @@ sub init_modules($self) {
         }
     }
 }
+
+=item C<< $core->init_events >>
+
+Initializes an array of events. This maps event numbers to their names.
+
+=cut
 
 sub init_events($self) {
     $self->{event_map} = [
@@ -207,27 +319,52 @@ sub init_events($self) {
     ];
 }
 
-sub fail_module($self, $module, $timer) {
-    my $tmr = $module->get_timer($timer);
+=item C<< $core->fail_module($module, $counter) >>
+
+Handles a module failure using the C<$counter>.
+If the C<$counter> reaches zero, the module is replaced by L<Stalk::Fail>.
+
+=cut
+
+sub fail_module($self, $module, $counter) {
+    my $tmr = $module->get_timer($counter);
 
     if (!($$tmr--)) {
-        $self->log->error("module depleted timer '$timer' for the last time, disabling");
+        $self->log->error("module depleted counter '$counter' for the last time, disabling");
         $module->fail;
         return $module->invoke;
     } else {
         # temporarily disable module
         return {
-            name        => "__zero",
-            instance    => $module->name,
+            instance    => "__zero",
+            name        => $module->driver,
             text        => $module->name_canon,
             blink       => $self->cfg->{cooldown},
             cache       => $self->cfg->{cooldown},
             background  => "%{core.fail.bg,bg,black}",
             color       => "%{core.fail.fg,fg,orange,yellow}",
-            icon        => ($timer eq "fail" ? "" : ""),
+            icon        => ($counter eq "fail" ? "" : ""),
         };
     }
 }
+
+=back
+
+=head2 Output generation
+
+Methods associated with running modules and constructing output for i3.
+
+=over
+
+=item C<< $core->run >>
+
+Calls C<invoke> on all modules, except those with cached values.
+If a module timeouts or fails, it gets replaced by whatever
+L</fail_module> returns.
+
+In later methods, whatever the C<invoke> or cache returns, is called a segment.
+
+=cut
 
 sub run($self) {
     my $ret = [];
@@ -276,157 +413,11 @@ sub run($self) {
     return $ret;
 }
 
-sub post_process_seg($self, $ret) {
-    my $alt = 0;
-    foreach my $seg (@$ret) {
-        # skip separators
-        if (exists $seg->{separator}) {
-            ++$alt;
-            next;
-        }
+=item C<< $core->post_process($ret) >>
 
-        # add defaults
-        while (my ($k, $v) = each $self->cfg->{defaults}->%*) {
-            next if exists $seg->{$k} || !defined $v;
+Runs postprocessing methods below on the data returned by all modules.
 
-            $seg->{$k} = ($k eq "background" && ($alt % 2 == 1)
-                    && defined $self->cfg->{alternate})
-                ? $self->cfg->{alternate}
-                : $v;
-        }
-
-        # resolve colors if required
-        foreach my $k (qw(color background border)) {
-            next if !defined $seg->{$k};
-            $seg->{$k} = $self->theme->resolve($seg->{$k}) // $self->cfg->{defaults}->{$k};
-        }
-
-        # combine text, icon into full_text
-        if (defined $seg->{text} && defined $seg->{icon}) {
-            $seg->{full_text} = join " ", $seg->{icon}, $seg->{text};
-        } elsif (defined $seg->{text} || defined $seg->{icon}) {
-            $seg->{full_text} = join "", ($seg->{icon} // ""), ($seg->{text} // "");
-        }
-    }
-}
-
-sub post_process_inversion($self, $ret) {
-    foreach my $seg (@$ret) {
-        # separators are not supposed to blink
-        next if exists $seg->{separator};
-
-        my $module = $self->mod($seg->{name});
-        $module->delete_timer("invert")
-            if $seg->{reset_invert} || $seg->{reset_all};
-
-        my $timer = $module->get_or_set_timer("invert", $seg->{invert});
-        next if !defined $timer;
-
-        # advance timer, use global if evaluates to inf
-        my $tick = int($$timer == "+inf" || ref $timer eq "SCALAR"
-            ? $self->ticks->$* : $$timer);
-
-        # set inversion
-        $seg->{invert} = 1 if $tick >= 0;
-
-        # remove timer if expired
-        $module->delete_timer("invert") unless $$timer--;
-    }
-}
-
-sub post_process_blinking($self, $ret) {
-    foreach my $seg (@$ret) {
-        # separators are not supposed to blink
-        next if exists $seg->{separator};
-
-        my $module = $self->mod($seg->{name});
-        $module->delete_timer("blink")
-            if $seg->{reset_blink} || $seg->{reset_all};
-
-        my $timer = $module->get_or_set_timer("blink", $seg->{blink});
-        next if !defined $timer;
-
-        # advance timer, use global if evaluates to inf
-        my $tick = int($$timer == "+inf" || ref $timer eq "SCALAR"
-            ? $self->ticks->$* : $$timer);
-
-        # use xor to invert blinking if 'invert' flag is already set
-        $seg->{invert} = ($seg->{invert} xor ($tick % 2 == 0));
-
-        # remove timer if expired
-        $module->delete_timer("blink") unless $$timer--;
-    }
-}
-
-sub post_process_inverted($self, $ret) {
-    foreach my $seg (@$ret) {
-        # separators are not to be inverted (here)
-        next if exists $seg->{separator};
-
-        if ($seg->{invert}) {
-            # set sane defaults
-            foreach (qw(color background)) {
-                $seg->{$_} = $self->cfg->{defaults}->{$_}
-                    unless defined $seg->{$_};
-            }
-
-            $seg->@{qw(color background)} = $seg->@{qw(background color)};
-        }
-    }
-}
-
-sub post_process_sep($self, $ret) {
-    my $default_bg = $self->cfg->{defaults}->{background};
-
-    my $counter = 0;
-    foreach my $ix (0..$#$ret) {
-        my $sep = $ret->[$ix];
-        next if !exists $sep->{separator};
-
-        # set separator icon
-        $sep->{full_text} = "%utf8{ee82b2}";
-        # copy color of the next segment if exists
-        $sep->{color} = defined $ret->[$ix + 1]
-                      ? ($ret->[$ix + 1]->{background} // $default_bg)
-                      : '000000';
-
-        # first segment has no background nor border
-        if (!$ix) {
-            delete $sep->@{qw(background border)};
-        # other segments have background of previous segments
-        } else {
-            delete $sep->{border};
-            $sep->{background} = $ret->[$ix - 1]->{background} // $default_bg;
-        }
-
-        $sep->{name} = $sep->{instance} = "__separator_$counter";
-        ++$counter;
-    }
-}
-
-sub post_process_attr($self, $ret) {
-    foreach my $seg (@$ret) {
-        # add '$' before colors if not present
-        foreach my $col (qw(color background border)) {
-            if (defined $seg->{$col} && $seg->{$col} !~ m/^\$/) {
-                $seg->{$col} = '$' . $seg->{$col};
-            }
-        }
-
-        # replace '%utf8{byte}' with utf8 character
-        $seg->{full_text} =~ s/%utf8\{(.*?)\}/$self->u8($1)/ge;
-
-        # add padding if requested
-        if ($self->cfg->{padding} && $seg->{name} !~ m/^__separator_/) {
-            my $pad = " " x $self->cfg->{padding};
-            $seg->{full_text} = $pad . $seg->{full_text} . $pad;
-        }
-
-        # remove i3status separator
-        $seg->{separator} = JSON::XS::false;
-        $seg->{separator_block_width} = 0;
-    }
-}
+=cut
 
 sub post_process($self, $ret) {
     # process all module segments
@@ -452,31 +443,229 @@ sub post_process($self, $ret) {
     }
 }
 
-# event processing
+=item C<< $core->post_process_seg >>
 
-sub event_button($self, $code) {
-    return $self->{event_map}->[$code];
+Processes segment colors, alternating colors and builds C<full_text>
+from C<icon> and/or C<text>.
+
+=cut
+
+sub post_process_seg($self, $ret) {
+    my $alt = 0;
+    foreach my $seg (@$ret) {
+        # skip separators
+        if (exists $seg->{separator}) {
+            ++$alt;
+            next;
+        }
+
+        # add defaults
+        while (my ($k, $v) = each $self->cfg->{defaults}->%*) {
+            next if exists $seg->{$k} || !defined $v;
+
+            $seg->{$k} = ($k eq "background" && ($alt % 2 == 1)
+                    && defined $self->cfg->{alternate})
+                ? $self->cfg->{alternate}
+                : $v;
+        }
+
+        # resolve gradients if required
+        foreach my $k (qw(color background border)) {
+            my $g = $k . "_grad";
+            next if !defined $seg->{$g};
+            $seg->{$k} = $self->theme->grad((delete $seg->{$g})->@*);
+        }
+
+        # resolve colors if required
+        foreach my $k (qw(color background border)) {
+            next if !defined $seg->{$k};
+            $seg->{$k} = $self->theme->resolve($seg->{$k}) // $self->cfg->{defaults}->{$k};
+        }
+
+        # combine text, icon into full_text
+        if (defined $seg->{text} && defined $seg->{icon}) {
+            $seg->{full_text} = join " ", $seg->{icon}, $seg->{text};
+        } elsif (defined $seg->{text} || defined $seg->{icon}) {
+            $seg->{full_text} = join "", ($seg->{icon} // ""), ($seg->{text} // "");
+        }
+    }
 }
 
-sub process_event($self, $mod, $data) {
-    # module might want to redraw after event
-    $self->cache->flush($mod->name)
-        if $data->{flush};
+=item C<< $core->post_process_inversion($ret) >>
 
-    # stop timers
-    $mod->delete_timer("blink")
-        if $data->{reset_blink}  || $data->{reset_all};
+Processes C<invert> command in the segment, from the aspect of timers.
+It does not actually invert colors, as blinking might affect the
+inversion again.
 
-    $mod->delete_timer("invert")
-        if $data->{reset_invert} || $data->{reset_all};
+=cut
 
-    # reset timers on demand
-    $mod->get_or_set_timer("blink", $data->{blink})
-        if defined $data->{blink};
+sub post_process_inversion($self, $ret) {
+    foreach my $seg (@$ret) {
+        # separators are not supposed to blink
+        next if exists $seg->{separator};
 
-    $mod->get_or_set_timer("invert", $data->{invert})
-        if defined $data->{invert};
+        my $module = $self->mod($seg->{instance});
+        $module->delete_timer("invert")
+            if $seg->{reset_invert} || $seg->{reset_all};
+
+        my $timer = $module->get_or_set_timer("invert", $seg->{invert});
+        next if !defined $timer;
+
+        # advance timer, use global if evaluates to inf
+        my $tick = int($$timer == "+inf" || ref $timer eq "SCALAR"
+            ? $self->ticks->$* : $$timer);
+
+        # set inversion
+        $seg->{invert} = 1 if $tick >= 0;
+
+        # remove timer if expired
+        $module->delete_timer("invert") unless $$timer--;
+    }
 }
+
+=item C<< $core->post_process_blinking($ret) >>
+
+Processes C<blink> command in the segment, from the aspect of timers.
+Blinking is essentially just periodical inversion.
+
+=cut
+
+sub post_process_blinking($self, $ret) {
+    foreach my $seg (@$ret) {
+        # separators are not supposed to blink
+        next if exists $seg->{separator};
+
+        my $module = $self->mod($seg->{instance});
+        $module->delete_timer("blink")
+            if $seg->{reset_blink} || $seg->{reset_all};
+
+        my $timer = $module->get_or_set_timer("blink", $seg->{blink});
+        next if !defined $timer;
+
+        # advance timer, use global if evaluates to inf
+        my $tick = int($$timer == "+inf" || ref $timer eq "SCALAR"
+            ? $self->ticks->$* : $$timer);
+
+        # use xor to invert blinking if 'invert' flag is already set
+        $seg->{invert} = ($seg->{invert} xor ($tick % 2 == 0));
+
+        # remove timer if expired
+        $module->delete_timer("blink") unless $$timer--;
+    }
+}
+
+=item C<< $core->post_process_inverted($ret) >>
+
+Does actual color inversion, requires processing from previous two methods.
+
+=cut
+
+sub post_process_inverted($self, $ret) {
+    foreach my $seg (@$ret) {
+        # separators are not to be inverted (here)
+        next if exists $seg->{separator};
+
+        if ($seg->{invert}) {
+            # set sane defaults
+            foreach (qw(color background)) {
+                $seg->{$_} = $self->cfg->{defaults}->{$_}
+                    unless defined $seg->{$_};
+            }
+
+            $seg->@{qw(color background)} = $seg->@{qw(background color)};
+        }
+    }
+}
+
+=item C<< $core->post_process_sep($ret) >>
+
+Once colors and backgrounds of module segments are resolved, this methods
+determines foreground and background colors of separators.
+
+    M1 <SEPARATOR< M2
+
+In above example, SEPARATOR will have background of M1 and foreground of M2.
+
+=cut
+
+sub post_process_sep($self, $ret) {
+    my $default_bg = $self->cfg->{defaults}->{background};
+
+    my $counter = 0;
+    foreach my $ix (0..$#$ret) {
+        my $sep = $ret->[$ix];
+        next if !exists $sep->{separator};
+
+        # set separator icon
+        $sep->{full_text} = $self->cfg->{separator};
+        # copy color of the next segment if exists
+        $sep->{color} = defined $ret->[$ix + 1]
+                      ? ($ret->[$ix + 1]->{background} // $default_bg)
+                      : '000000';
+
+        # first segment has no background nor border
+        if (!$ix) {
+            delete $sep->@{qw(background border)};
+        # other segments have background of previous segments
+        } else {
+            delete $sep->{border};
+            $sep->{background} = $ret->[$ix - 1]->{background} // $default_bg;
+        }
+
+        $sep->@{qw(name instance)} = ("__separator", "__separator_$counter");
+        ++$counter;
+    }
+}
+
+=item C<< $core->post_process_attr($ret) >>
+
+Final postprocessing, which adds padding, replaces C<%utf8{...}> segments
+and turns of i3 separators.
+
+=cut
+
+sub post_process_attr($self, $ret) {
+    foreach my $seg (@$ret) {
+        # add '$' before colors if not present
+        foreach my $col (qw(color background border)) {
+            if (defined $seg->{$col} && $seg->{$col} !~ m/^\$/) {
+                $seg->{$col} = '$' . $seg->{$col};
+            }
+        }
+
+        # replace '%utf8{byte}' with utf8 character
+        $seg->{full_text} =~ s/%utf8\{(.*?)\}/$self->u8($1)/ge;
+
+        # add padding if requested
+        if ($self->cfg->{padding} && $seg->{instance} !~ m/^__separator/) {
+            my $pad = " " x $self->cfg->{padding};
+            $seg->{full_text} = $pad . $seg->{full_text} . $pad;
+        }
+
+        # remove i3status separator
+        $seg->{separator} = JSON::false;
+        $seg->{separator_block_width} = 0;
+    }
+}
+
+=back
+
+=head2 Event processing
+
+=over
+
+=item C<< $core->event($event) >>
+
+Processes event parsed from i3bar.
+The event should look like this in JSON:
+
+    {
+        "name":     "name_of_component",
+        "button":   button_code,
+        # additional attributes
+    }
+
+=cut
 
 sub event($self, $event) {
     my $target = $event->{instance};
@@ -496,11 +685,15 @@ sub event($self, $event) {
     $self->cache->flush($mod->name)
         if ($mod->refresh_on_event);
 
-    my $data = $mod->run("on_$button");
+    my $data = defined $button
+        ? $mod->run("on_$button")
+        : $mod->run("on_event", $event);
 
     if ($data->{fatal}) {
+        $self->cache->flush($mod->name);
         $data = $self->fail_module($mod, "fail");
     } elsif ($data->{timeout}) {
+        $self->cache->flush($mod->name);
         $data = $self->fail_module($mod, "timeout");
     } elsif ($data->{ok}) {
         $data = $data->{content};
@@ -509,12 +702,51 @@ sub event($self, $event) {
     }
 
     if (defined $data and ref $data eq "HASH") {
-        $self->process_event($mod, $data);
+        $self->process_event_output($mod, $data);
     } elsif (defined $data) {
         $self->log->debug("event returned ref '", ref($data), "', ignoring");
     }
 }
 
-# vim: syntax=perl5-24
+=item C<< $core->event_button($code) >>
+
+Translates button code to a name using a map initialized in L</init_events>.
+
+=cut
+
+sub event_button($self, $code) {
+    return $self->{event_map}->[$code];
+}
+
+=item C<< $core->process_event_output($mod, $data) >>
+
+If event handler returns C<HASHREF>, it is processed by this method.
+It allows to set or unset timers for inversion and caching.
+
+=cut
+
+sub process_event_output($self, $mod, $data) {
+    # module might want to redraw after event
+    $self->cache->flush($mod->name)
+        if $data->{flush};
+
+    # stop timers
+    $mod->delete_timer("blink")
+        if $data->{reset_blink}  || $data->{reset_all};
+
+    $mod->delete_timer("invert")
+        if $data->{reset_invert} || $data->{reset_all};
+
+    # reset timers on demand
+    $mod->get_or_set_timer("blink", $data->{blink})
+        if defined $data->{blink};
+
+    $mod->get_or_set_timer("invert", $data->{invert})
+        if defined $data->{invert};
+}
+
+=back
+
+=cut
 
 1;

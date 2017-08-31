@@ -1,6 +1,5 @@
 package Leaf::ArchCPU;
 
-use v5.26;
 use utf8;
 use strict;
 use warnings;
@@ -80,16 +79,18 @@ sub invoke($self) {
 
     my $ncpu = int $self->{step} == -1 ? "A" : int $self->{step};
     my $util = $self->compute_usage(%data);
-    my $fg   = $self->theme->grad($util, '%{archcpu.@grad,cpu.@grad,@green-to-red,green yellow red}');
 
     my $ret = {
         text        => sprintf("$ncpu %3d%%", $util),
         icon        => "",
-        color       => $fg,
+        color_grad  => [
+                $util,
+                '%{archcpu.@grad,cpu.@grad,@green-to-red,green yellow red}',
+            ],
     };
 
-    $ret->{invert} = $self->{refresh} if $util >= $self->{warning};
-    $ret->{blink}  = $self->{refresh} if $util >= $self->{critical};
+    $ret->{invert} = $self->refresh if $util >= $self->{warning};
+    $ret->{blink}  = $self->refresh if $util >= $self->{critical};
     return $ret;
 }
 
@@ -109,7 +110,5 @@ sub on_middle_click($self) {
     delete $self->{prev};
     $self->{step}->reset;
 }
-
-# vim: syntax=perl5-24
 
 1;

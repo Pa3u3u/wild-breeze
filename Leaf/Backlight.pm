@@ -9,6 +9,7 @@ use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
 use Breeze::Grad;
+use File::Slurp;
 
 sub new($class, %args) {
     my $self = $class->SUPER::new(%args);
@@ -21,18 +22,21 @@ sub new($class, %args) {
 }
 
 sub invoke($self) {
-    my $max = qx(cat /sys/class/backlight/$self->{video}/max_brightness);
-    my $cur = qx(cat /sys/class/backlight/$self->{video}/brightness);
+    my $path = "/sys/class/backlight/$self->{video}";
+    my $max = read_file("$path/max_brightness");
+    my $cur = read_file("$path/brightness");
 
     chomp($max, $cur);
 
     my $p = int ((100 * $cur) / $max);
-    my $c = $self->theme->grad($p, '%{backlight.@grad,gray white}');
 
     my $ret = {
         icon      => "",
         text      => sprintf("%3d%%", $p),
-        color     => $c,
+        color     => [
+            $p,
+            '%{backlight.@grad,gray white}'
+        ],
     };
 
     if (($self->{last} // $p) != $p) {
@@ -62,7 +66,5 @@ sub on_middle_click($) {
 
     return { reset_all => 1, blink => 4 };
 }
-
-# vim: syntax=perl5-24
 
 1;

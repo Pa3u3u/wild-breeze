@@ -1,6 +1,5 @@
-package Leaf::Fail;
+package Stalk::Fail;
 
-use v5.26;
 use utf8;
 use strict;
 use warnings;
@@ -42,7 +41,5 @@ sub invoke($self) {
     ++$self->{tc};
     return $ret;
 }
-
-# vim: syntax=perl5-24
 
 1;
