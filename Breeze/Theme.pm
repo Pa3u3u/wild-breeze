@@ -7,6 +7,7 @@ use warnings;
 use feature     qw(signatures);
 no  warnings    qw(experimental::signatures);
 
+use Breeze::Grad;
 use List::Util  qw(any);
 
 =head1 NAME
