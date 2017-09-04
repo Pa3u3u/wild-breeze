@@ -152,6 +152,9 @@ to empty. When charging, a lightning icon is shown instead.
 The color changes, by default, from red when depleted to green when
 fully charged.
 
+If `estimate` is enabled, the component will show estimated time until
+the battery is depleted, using linear regression.
+
 ## Events
 
 None.
@@ -169,6 +172,10 @@ configuration parameters).
     defaults to 20
   - `critical` — blink when battery percentage is below this point,
     defaults to 10
+  - `estimate` — if defined, the module will use this many samples
+    to estimate the time until battery gets fully depleted using linear
+    regression; more samples will yield slower computation but
+    better estimate; if value is less than 2, 2 will be used instead
 
 Example configuration:
 
@@ -178,6 +185,7 @@ Example configuration:
     battery:    BAT0
     warning:    20
     critical:   10
+    estimate:   50
 ```
 
 ## Theme colors
