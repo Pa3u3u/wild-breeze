@@ -472,8 +472,12 @@ sub post_process_seg($self, $ret) {
         # resolve gradients if required
         foreach my $k (qw(color background border)) {
             my $g = $k . "_grad";
-            next if !defined $seg->{$g};
-            $seg->{$k} = $self->theme->grad((delete $seg->{$g})->@*);
+
+            if (defined $seg->{$g}) {
+                $seg->{$k} = $self->theme->grad((delete $seg->{$g})->@*);
+            } elsif (ref $seg->{$k} eq "ARRAY") {
+                $seg->{$k} = $self->theme->grad($seg->{$k}->@*);
+            }
         }
 
         # resolve colors if required

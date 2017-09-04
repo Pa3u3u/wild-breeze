@@ -397,6 +397,10 @@ When implementing a new module, you should always provide a way to
     and never use `@` in names of colors. Components in wild-breeze
     use `@` just before the name of the gradient, after the "namespace",
     e.g. `battery.@grad`.
+  - it is not an error to assign an arrayref to `color` or `background`,
+    wild-breeze will take care of that, but `color` and `color_grad`
+    can be used to distinguish between regular colors and gradients
+  - it is, however, an error to assign a regular color to `color_grad`
 
 ## A few notes on `invert` and `blink`
 
