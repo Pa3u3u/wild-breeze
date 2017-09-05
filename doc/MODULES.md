@@ -14,6 +14,7 @@ Modules that extend wild-breeze and draw components on the i3bar
   - [`Leaf::MemInfo`](#leafmeminfo)
   - [`Leaf::PAMixer`](#leafpamixer)
   - [`Leaf::Spotify`](#leafspotify)
+  - [`Leaf::TouchPad`](#leaftouchpad)
   - [`Leaf::Time`](#leaftime)
 
 ## How it works
@@ -655,6 +656,34 @@ None.
 
 Sometimes, when Spotify exists, the connection to DBus takes a very long
 time, which causes the module to time out.
+
+# `Leaf::TouchPad`
+
+Displays the state of touchpad using `synclient` command.
+
+## Events
+
+  - `mouse left click` — toggle touchpad state
+
+## Dependencies
+
+  - `extra/xf86-input-synaptics` (ArchLinux) (`xorg-drivers`)
+
+  Synaptics driver for notebook touchpads
+
+## Configuration parameters
+
+  - `icon` — icon to display, defaults to 
+
+## Theme colors
+
+  - `touchpad.off`, `aluminum`, `gray`
+
+    When touchpad is turned off
+
+  - `toucpad.on`, `green`
+
+    When touchpad is turned on
 
 # `Leaf:Time`
 
