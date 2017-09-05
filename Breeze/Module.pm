@@ -225,7 +225,7 @@ sub fail($self) {
     $self->{module} = Stalk::Fail->new(
         name    => $self->name,
         log     => $self->log,
-        text    => $self->canon_name,
+        text    => $self->name_canon,
     );
 }
 
