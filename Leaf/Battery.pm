@@ -33,6 +33,7 @@ sub estimate($self, $t, $e) {
     push $self->{est_tab}->@*, [ $t, $e ];
     return unless scalar $self->{est_tab} >= 2;
 
+    my $float_delta = 0.0000001;
     # use linear regression to compute A,B in e = A + Bt
 
     # compute averages
@@ -53,7 +54,7 @@ sub estimate($self, $t, $e) {
         $cov_te += ($p->[0] - $avg_t) * ($p->[1] - $avg_e);
     }
 
-    return unless abs($var_t) > 0.0000001;
+    return unless abs($var_t) > $float_delta;
 
     # compute B
     my $B = $cov_te / $var_t;
@@ -61,6 +62,7 @@ sub estimate($self, $t, $e) {
     # compute A
     my $A = $avg_e - $B * $avg_t;
 
+    return unless abs($B) >= $float_delta;
     # finally, compute t0 where e0 == 0
     my $t0 = - $A / $B;
 
