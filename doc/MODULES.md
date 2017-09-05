@@ -652,11 +652,6 @@ None.
 
     When an error occurs when contacting DBus
 
-## Known bugs
-
-Sometimes, when Spotify exists, the connection to DBus takes a very long
-time, which causes the module to time out.
-
 # `Leaf::TouchPad`
 
 Displays the state of touchpad using `synclient` command.

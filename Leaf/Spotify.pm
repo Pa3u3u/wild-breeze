@@ -22,6 +22,10 @@ sub getobj($self) {
     my $obj = try {
         my $bus = Net::DBus->session()
             or $self->log->fatal("failed to connect to DBus");
+
+        # set timeout
+        $bus->timeout((1000 * $self->timeout) / 2);
+
         my $svc = $bus->get_service("org.mpris.MediaPlayer2.spotify")
             or return;
         my $obj = $svc->get_object("/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.Player");
