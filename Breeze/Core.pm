@@ -148,14 +148,65 @@ Validates the configuration. Croaks if it finds errors.
 =cut
 
 sub validate($self) {
+    my $cfg = $self->cfg;
+
+    foreach my $key (qw(tick timeout timeouts failures cooldown padding
+            separator theme defaults alternate modules
+            )) {
+        croak "'$key' is not defined in configuration"
+            unless defined $cfg->{$key};
+    }
+
+    croak "tick is not a positive number"
+        unless $cfg->{tick} >= 0;
     croak "timeout is not greater than zero"
-        unless $self->cfg->{timeout} > 0;
+        unless $cfg->{timeout} > 0;
     croak "timeouts is not greater than zero"
-        unless $self->cfg->{timeouts} > 0;
+        unless $cfg->{timeouts} > 0;
     croak "failures is not greater than zero"
-        unless $self->cfg->{failures} > 0;
+        unless $cfg->{failures} > 0;
     croak "cooldown is not greater than zero"
-        unless $self->cfg->{cooldown} > 0;
+        unless $cfg->{cooldown} > 0;
+    croak "padding is not greater than zero"
+        unless $cfg->{padding} > 0;
+
+    croak "defaults is not a hash"
+        unless ref $cfg->{defaults} eq "HASH";
+
+    foreach my $key (qw(background color border)) {
+        croak "missing defaults.$key in configuration"
+            unless exists $cfg->{defaults}->{$key};
+    }
+
+    croak "modules is not an array"
+        unless ref $cfg->{modules} eq "ARRAY";
+
+    my $names = {};
+    foreach my $mod ($cfg->{modules}->@*) {
+        if (ref $mod eq "HASH") {
+            croak "empty hash in module definition"
+                if scalar keys %$mod < 1;
+            croak "too many keys in module definition: '" . join(",", keys %$mod), "'"
+                if scalar keys %$mod > 1;
+
+            my $key = (keys %$mod)[0];
+            my $def = $mod->{$key};
+
+            croak "missing or invalid driver option in definition of '$key'"
+                unless defined $def->{driver} && length $def->{driver} > 0;
+
+            croak "invalid timeout in definition of '$key'"
+                if defined $def->{timeout} && $def->{timeout} <= 0;
+
+            croak "invalid refresh in definition of '$key'"
+                if defined $def->{refresh} && $def->{refresh} <  1;
+        } elsif (ref $mod eq "") {
+            croak "invalid scalar '$mod', did you want 'separator'?"
+                unless $mod eq "separator";
+        } else {
+            croak "found " . ref($mod) . " in module definition";
+        }
+    }
 }
 
 =item C<< $core->u8($string) >>
@@ -246,8 +297,6 @@ sub init_modules($self) {
             my $inst = try {
                 if (!defined $template->{timeout}) {
                     $template->{timeout} = $self->cfg->{timeout};
-                } elsif ($template->{timeout} <= 0) {
-                    $self->log->fatal("invalid timeout for '$name'($driver): $template->{timeout}");
                 }
 
                 Breeze::Module->new($name, $template, {
@@ -270,7 +319,7 @@ sub init_modules($self) {
                     $self->log->fatal("Stalk::Fail failed, something's gone terribly wrong");
                 }
 
-                $self->log->info("replacing  with failed placeholder");
+                $self->log->info("replacing with failed placeholder");
 
                 $modcfg = {
                     "__failed_" . $self->{mods}->$#* => {
