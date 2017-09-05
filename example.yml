@@ -18,6 +18,9 @@ debug: no
 # value is set to 1 (as it should be), all ticks are roughly equivalent
 # to seconds.
 #
+# This option exists only for testing purposes. Do not modify it, unless
+# you are sure it does what you think it does.
+#
 # Values: positive integers
 tick: 1
 
