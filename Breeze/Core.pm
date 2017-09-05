@@ -299,6 +299,8 @@ sub init_modules($self) {
                     $template->{timeout} = $self->cfg->{timeout};
                 }
 
+                # reset DIE handler
+                local $SIG{__DIE__} = undef;
                 Breeze::Module->new($name, $template, {
                     log         => $self->log,
                     theme       => $self->theme,

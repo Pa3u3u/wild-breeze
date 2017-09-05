@@ -40,6 +40,18 @@ sub read_config($filename) {
     # $fh gets closed when it goes out of scope
 }
 
+sub error_handler($i3, @message) {
+    my $msg = join "", @message;
+    chomp $msg;
+    $msg =~ s/\n/ /g;
+
+    $i3->error($msg);
+    sleep 10;
+
+    $i3->error("see logfile (or enable logging) for more details");
+    sleep 10;
+}
+
 #-------------------------------------------------------------------------------
 # Entry
 #-------------------------------------------------------------------------------
@@ -89,11 +101,17 @@ my $theme_file = $options->{theme} // $config->{theme} // $defaults->{theme};
 $theme_file = "$Bin/$theme_file" if $theme_file !~ m!^/!;
 my $theme  = read_config($theme_file);
 
+# turn off buffering
+STDOUT->autoflush(1);
+STDERR->autoflush(1);
+
 # set up I3 output
 my $i3 = Breeze::I3->new();
 
 $i3->start;
 $i3->init_msg("starting wild-breeze");
+
+local $SIG{__DIE__} = sub { error_handler($i3, @_); };
 
 # initialize the core
 my $breeze = Breeze::Core->new($config, $theme);
@@ -105,20 +123,19 @@ my $select = IO::Select->new(*STDIN)
 
 #-------------------------------------------------------------------------------
 
-# turn off buffering
-STDOUT->autoflush(1);
-STDERR->autoflush(1);
-
 # enter the main loop
 MAIN_LOOP:
 while (1) {
     # print output
     my $data = try {
+        local $SIG{__DIE__} = undef;
         return $breeze->run;
     } catch {
         chomp $_;
         $log->error("fatal error in run handler");
         $log->error($_);
+
+        error_handler($i3, $_);
         $log->fatal("cannot continue");
     };
 
@@ -139,7 +156,16 @@ while (1) {
 
         # process all created events
         while (my $event = $i3->next_event) {
-            $breeze->event($event);
+            try {
+                local $SIG{__DIE__} = undef;
+                $breeze->event($event);
+            } catch {
+                chomp $_;
+                $log->error("fatal error in event handler");
+                $log->error("$_");
+
+                error_handler($i3, $_);
+            };
         }
     }
 }

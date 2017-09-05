@@ -78,7 +78,7 @@ sub next($self, $data) {
     print $self->json->encode($data), ",\n";
 }
 
-=item C<< $i3->init_msg($message) >>
+=item C<< $i3->init_msg(@message) >>
 
 Prints an informational message to the bar.
 This method is intended to write information like C<"starting">.
@@ -105,6 +105,41 @@ sub init_msg($self, @message) {
         {
             full_text   => "",
             background  => '$002b36',
+            color       => '$000000',
+            separator   => JSON::false,
+            separator_block_width => 0,
+        }
+    ]);
+}
+
+=item C<< $i3->error(@message) >>
+
+Prints an error to the bar.
+You should use C<sleep> or something similar after this call, so that
+the output will not get immediately overdrawn.
+
+=cut
+
+sub error($self, @message) {
+    $self->next([
+        {
+            full_text   => "",
+            color       => '$dc322f',
+            separator   => JSON::false,
+            separator_block_width => 0,
+        },
+        {
+            full_text   => " " . join("", @message),
+            color       => '$002b36',
+            background  => '$dc322f',
+            name        => "msg",
+            entry       => "msg",
+            separator   => JSON::false,
+            separator_block_width => 0,
+        },
+        {
+            full_text   => "",
+            background  => '$dc322f',
             color       => '$000000',
             separator   => JSON::false,
             separator_block_width => 0,
