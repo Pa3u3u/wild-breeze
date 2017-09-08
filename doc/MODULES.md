@@ -162,8 +162,7 @@ None.
 
 ## Dependencies
 
-None (except the programs you decide to use in `commands` or `events`
-configuration parameters).
+None.
 
 ## Configuration parameters
 
@@ -210,7 +209,9 @@ to some events.
 
 ## Dependencies
 
-None.
+None (except the programs you decide to use in `commands` or `events`
+configuration parameters).
+
 
 ## Configuration parameters
 
@@ -266,9 +267,9 @@ Since this operation is usually "slow" (that is, too slow to wait for the
 output when redrawing i3bar), the process itself is run asynchronously.
 The connection is **always** made using SSL socket.
 
-Login information are read from muttrc file, where it loks for `imap_user` and
-`imap_pass` options. If you do not use mutt or do not want wild-breeze
-to read the file, just create a different file, e.g. `~/.imap_cred`:
+Login credentials are read from a muttrc file, parameters `imap_user` and
+`imap_pass`. If you do not use mutt or do not want wild-breeze
+to read your `.muttrc`, just create a different file, e.g. `~/.imap_cred`:
 
 ```bash
 touch ~/.imap_cred
@@ -284,7 +285,7 @@ set imap_pass = "PASSWORD"
 
 ## Events
 
-  - `mouse left click` — check e-mails immediately
+  - `mouse left click` — check for new e-mails immediately
 
 ## Dependencies
 
@@ -308,7 +309,7 @@ Example configuration:
 ```yaml
 - mail:
     driver:         Leaf::IMAPUnread
-    muttrc:         /home/cweorth/.muttrc
+    muttrc:         /home/user/.muttrc
     server:         imap.example.com
     port:           993
     filter:         "^Personal/"
@@ -347,18 +348,18 @@ Example configuration:
 ![IPAddr Example](ipaddr.png)
 
 Displays information about a network interface.
-By default show only an indicator whether the interface is DOWN (gray), UP
-with no IPs (orange) or UP (green).
+By default shows only an indicator whether the interface is DOWN (gray), UP
+with no IPs (orange) or UP (green) and ESSID if available.
 
-Adresses are parsed from the output of `ip addr show DEVICE`. Only
+Adresses are parsed from the output of `ip addr show ${DEVICE}`. Only
 adresses with `scope global` are shown. If the device happens to have
 an essid assigned (retrieved by `iwgetid`), it is shown as the first entry.
 
 ## Events
 
   - `mouse left click` — toggle visibility of IP addresses
-  - `mouse next` — show next IP address if there are more than 1
-  - `mouse prev` - show previous IP address if there are more than 1
+  - `mouse next` — show next IP address if there is more than one
+  - `mouse prev` - show previous IP address if there is more than one
 
 ## Dependencies
 
@@ -465,8 +466,8 @@ which are here called "displays" for simplicity.
 
 ## Events
 
-  - `mouse next` — next display if there are more than 1
-  - `mouse prev` — previous display if there are more than 1
+  - `mouse next` — next display if there is more than one
+  - `mouse prev` — previous display if there is more than one
   - `mouse left click` — start or stop automatic switching between displays if enabled
     by the `switch` configuration parameter
 
