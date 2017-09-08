@@ -163,7 +163,6 @@ sub set_timer($self, $timer, $ticks) {
     croak "Ticks or timer invalid"
         unless defined $timer && defined $ticks && $ticks >= 0;
 
-    $self->log->debug($self->name, "->set_timer($timer,$ticks)");
     # optimization: do not store counter for only one cycle,
     # use local variable instead
     if ($ticks == 0) {
@@ -192,7 +191,6 @@ C<$ticks> is different than the current value of the timer.
 =cut
 
 sub get_or_set_timer($self, $timer, $ticks = undef) {
-    $self->log->debug($self->name, "->get_or_set_timer($timer,", ($ticks // "undef"), ")");
     my $tmref = $self->get_timer($timer);
 
     if (!defined $$tmref && defined $ticks && $ticks >= 0) {
@@ -210,7 +208,6 @@ Deletes the timer with the name C<$timer>.
 =cut
 
 sub delete_timer($self, $timer) {
-    $self->log->debug($self->name, "->delete_timer($timer)");
     delete $self->timers->{$timer};
 }
 
