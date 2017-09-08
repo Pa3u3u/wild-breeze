@@ -9,10 +9,31 @@
 I just used the [Project Name Generator](http://online-generator.com/name-generator/project-name-generator.php)
 and I liked the name.
 
+## Duh, I mean, why another i3status replacement?
+
+I tried a few alternatives listed on [ArchLinux Wiki page on i3](https://wiki.archlinux.org/index.php/i3#i3bar_alternatives),
+but they were either outdated, no longer supported or required too much
+effort to get them running on my system.
+
+I liked [i3status-rust](https://github.com/greshake/i3status-rust) the most,
+but several plugins do not work on my system and I don't know rust, so
+I couldn't fix them. I must admit that I got inspired by it's graphical design,
+though.
+
+wild-breeze provides a few advantages over these replacements, such as
+  - named colors in themes
+  - gradients
+  - inversion and blinking on demand
+
+There are some disadvantages, of course, like
+  - it is written in Perl
+  - since it is brand new, there are still some bugs (issues or patches are welcome)
+
 ## Getting Started
 
 The following instructions will get you a running instance of `wild-breeze`.
-The whole program was developed and tested on ArchLinux. Some of the
+The whole program was developed and tested on ArchLinux, so this document
+provides package names from its repository or AUR. Some of the
 Perl libraries are **not** available in Arch repositories (not even `aur`,
 unfortunately), these you need to install using `cpan` or `cpanm`.
 
@@ -23,6 +44,8 @@ In order to run `wild-breeze` alone, you will need:
   - `core/perl`, version at least `5.20`
   - `community/awesome-terminal-fonts` or something that provides Font Awesome
   - `community/i3-wm` obviously
+
+You should also know, and be able to, install Perl dependencies.
 
 ### Perl Dependencies
 
