@@ -51,10 +51,22 @@ sub invoke($self, %args) {
         } else {
             $ret->{color} = "%{ipaddr.up,green}";
             $ret->{text}  = "UP";
-            $new = "UP," . scalar(@addresses);
+
+            my ($essid, undef, $status) = $self->run_command(
+                ["iwgetid", "--raw", $self->{device}],
+                stderr_fatal => 0, status_fatal => 0
+            );
+
+            if ($status eq 0) {
+                chomp $essid;
+                unshift @addresses, $essid;
+            }
+
+            $new = "UP|" . join("|", @addresses);
 
             if ($new ne $self->{last}) {
-                $self->{ix} = Breeze::Counter->fixed($#addresses);
+                $self->{hidden} = !defined $essid;
+                $self->{ix}     = Breeze::Counter->fixed($#addresses);
             }
 
             my $addr = $addresses[int ($self->{ix} // 0)];
@@ -69,8 +81,15 @@ sub invoke($self, %args) {
         $new = "UNKNOWN,0";
     }
 
-    if ($self->{last} ne $new && $self->{last} ne "INIT" && defined $self->{invert_on_change}) {
-        $ret->{invert} = $self->{invert_on_change};
+    if ($self->{last} ne $new && $self->{last} ne "INIT") {
+        if (defined $self->{invert_on_change}) {
+            $ret->{invert} = $self->{invert_on_change};
+        }
+
+        # try to get ESSID
+        my ($out, undef, $stat) = run_command([qw(iwgetid --raw), $self->{device}],
+            stderr_fatal => 0, status_fatal => 0
+        );
     }
 
     $self->{last} = $new;

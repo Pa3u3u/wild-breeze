@@ -351,7 +351,8 @@ By default show only an indicator whether the interface is DOWN (gray), UP
 with no IPs (orange) or UP (green).
 
 Adresses are parsed from the output of `ip addr show DEVICE`. Only
-adresses with `scope global` are shown.
+adresses with `scope global` are shown. If the device happens to have
+an essid assigned (retrieved by `iwgetid`), it is shown as the first entry.
 
 ## Events
 
