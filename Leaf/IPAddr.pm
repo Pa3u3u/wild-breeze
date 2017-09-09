@@ -87,7 +87,7 @@ sub invoke($self, %args) {
         }
 
         # try to get ESSID
-        my ($out, undef, $stat) = run_command([qw(iwgetid --raw), $self->{device}],
+        my ($out, undef, $stat) = $self->run_command([qw(iwgetid --raw), $self->{device}],
             stderr_fatal => 0, status_fatal => 0
         );
     }
