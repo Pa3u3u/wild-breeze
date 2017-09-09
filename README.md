@@ -2,7 +2,7 @@
 
 `wild-breeze` is a replacement of `i3bar` with extensions and events.
 
-![Example](doc/full-example.png)
+![Example](full-example.png)
 
 ## Why wild-breeze?
 
@@ -91,8 +91,8 @@ Please see [Modules page](doc/MODULES.md).
 
 First of all, copy the [example configuration file](example.yml) to a desired
 location (e.g. `~/.config/i3/breeze.yml`) and modify it as you want.
-You may want to add some modules, please see the list of [available modules](doc/MODULES.md)
-modules, how to configure them or a tutorial on [how to write your own modules](doc/CUSTOM_MODULES.md).
+You may want to add some modules, please see the list of available modules
+in the wiki page.
 
 ### Test run
 
@@ -138,70 +138,12 @@ Reload i3 and enjoy!
 
 ## What next?
 
-  - [Add more modules to your configuration](doc/MODULES.md)
-  - [Create your own modules](doc/CUSTOM_MODULES.md)
-  - [Create your own theme](doc/THEMES.md)
+See the project's wiki page for more details, e.g. how to use provided
+modules, how to write your own and so on.
 
 ## Troubleshooting
 
-### `Term::ANSIColor` complains about missing `ansi...` colors
-
-The `Term::ANSIColor` shipped with Perl may be too old, try installing
-a newer version with
-
-```bash
-cpanm Term::ANSIColor
-```
-
-### Perl complains about missing modules installed from CPAN
-
-To make Perl see locally installed modules, the `PERL5LIB` environment
-variable must be set up when starting i3. If you haven't installed `local::lib`,
-try running the following commands:
-
-```bash
-cpanm local::lib
-perl -Mlocal::lib >> ~/.profile
-```
-
-You need to logout & login back for this to take effect.
-
-Or, if you want to make sure it works without logging out, open a new terminal
-and type:
-
-```bash
-source ~/.profile
-ps -f $(pgrep i3bar)
-```
-
-The last line should print something like
-
-    i3bar --bar_id=bar-0 --socket=/run/user/1000/i3/ipc-socket.895
-
-Copy this line and then run
-
-```bash
-killall i3bar
-# the line you just copied
-i3bar --bar_id=bar-0 --socket=/run/user/1000/i3/ipc-socket.895
-```
-
-i3bar should start up.
-
-### Some modules fail to start up
-
-Look in the log (you may need to enable logging in the configuration file
-and restart the i3bar; or run `wild-breeze` from the terminal, see above).
-The log file should contain a line like
-
-    2017-09-02 10:30:15 fail[MODULE] ERROR MESSAGE
-
-Usually, the message will be related to the module, e.g. if you use
-`Leaf::PAMixer`, the message saying `The sink does not exist` means
-you need to find out the correct sink and update your configuration.
-
-If the message says `Can't locate ...`, then you didn't install some required
-modules properly.
+This section was moved to project's wiki page.
 
 ## Author
 
