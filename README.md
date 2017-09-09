@@ -2,7 +2,7 @@
 
 `wild-breeze` is a replacement of `i3bar` with extensions and events.
 
-![Example](full-example.png)
+![Example](example.png)
 
 ## Why wild-breeze?
 
