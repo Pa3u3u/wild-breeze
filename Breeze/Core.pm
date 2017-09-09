@@ -383,7 +383,7 @@ sub fail_module($self, $module, $counter) {
     if (!($$tmr--)) {
         $self->log->error("module depleted counter '$counter' for the last time, disabling");
         $module->fail;
-        return $module->invoke;
+        return $module->run("invoke");
     } else {
         # temporarily disable module
         return {
