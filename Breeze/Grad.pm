@@ -25,7 +25,7 @@ use Carp;
 use Math::Gradient  qw(multi_array_gradient);
 
 sub _rgb2array($col) {
-    return [ map { hex $_ } ($col =~ m!(..)(..)(..)!) ];
+    return [ map { hex $_ } ($col =~ m![\$#]?(..)(..)(..)!) ];
 }
 
 sub _array2rgb($arr) {

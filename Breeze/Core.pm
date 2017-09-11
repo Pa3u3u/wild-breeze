@@ -681,11 +681,9 @@ and turns of i3 separators.
 
 sub post_process_attr($self, $ret) {
     foreach my $seg (@$ret) {
-        # add '$' before colors if not present
+        # final color resolution
         foreach my $col (qw(color background border)) {
-            if (defined $seg->{$col} && $seg->{$col} !~ m/^\$/) {
-                $seg->{$col} = '$' . $seg->{$col};
-            }
+            $seg->{$col} = $self->theme->resolve($seg->{$col}) if defined $seg->{$col};
         }
 
         # replace '%utf8{byte}' with utf8 character

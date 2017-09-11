@@ -138,8 +138,13 @@ immediately used in i3 protocol.
 =cut
 
 sub resolve($self, $colspec) {
-    return $colspec         if $colspec =~ m/^\$[\da-f]{6}$/i;
-    return '$' . $colspec   if $colspec =~ m/^[\da-f]{6}$/i;
+    return if not defined $colspec;
+    return $colspec         if $colspec =~ m/^\#[\da-f]{6}$/i;
+    return '#' . $colspec   if $colspec =~ m/^[\da-f]{6}$/i;
+
+    if ($colspec =~ m/^\$(?<base>[\da-f]{6})$/i) {
+        return "#$+{base}";
+    }
 
     my $tmp = $self->cache->{$colspec};
     return $tmp if defined $tmp;

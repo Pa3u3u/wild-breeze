@@ -89,14 +89,14 @@ sub init_msg($self, @message) {
     $self->next([
         {
             full_text   => "",
-            color       => '$002b36',
+            color       => '#002b36',
             separator   => JSON::false,
             separator_block_width => 0,
         },
         {
             full_text   => " " . join("", @message),
-            color       => '$1e90ff',
-            background  => '$002b36',
+            color       => '#1e90ff',
+            background  => '#002b36',
             name        => "msg",
             entry       => "msg",
             separator   => JSON::false,
@@ -104,8 +104,8 @@ sub init_msg($self, @message) {
         },
         {
             full_text   => "",
-            background  => '$002b36',
-            color       => '$000000',
+            background  => '#002b36',
+            color       => '#000000',
             separator   => JSON::false,
             separator_block_width => 0,
         }
@@ -124,14 +124,14 @@ sub error($self, @message) {
     $self->next([
         {
             full_text   => "",
-            color       => '$dc322f',
+            color       => '#dc322f',
             separator   => JSON::false,
             separator_block_width => 0,
         },
         {
             full_text   => " " . join("", @message),
-            color       => '$002b36',
-            background  => '$dc322f',
+            color       => '#002b36',
+            background  => '#dc322f',
             name        => "msg",
             entry       => "msg",
             separator   => JSON::false,
@@ -139,8 +139,8 @@ sub error($self, @message) {
         },
         {
             full_text   => "",
-            background  => '$dc322f',
-            color       => '$000000',
+            background  => '#dc322f',
+            color       => '#000000',
             separator   => JSON::false,
             separator_block_width => 0,
         }
