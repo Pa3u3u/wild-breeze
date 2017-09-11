@@ -104,7 +104,7 @@ sub invoke($self) {
     my $result = $self->{job}->result;
     delete $self->{job};
 
-    if (!defined $result || $result !~ m/^(ok:\d+|connfail)$/) {
+    if (!defined $result || $result !~ m/^(ok:\d+|connfail:.*)$/) {
         $self->log->error("failed to obtain result from child: ", ($result // "<undef>"));
         return {
             text    => "$self->{last}?",
@@ -114,8 +114,9 @@ sub invoke($self) {
         };
     }
 
-    if ($result eq "connfail") {
+    if ($result =~ m/^connfail:(?<message>.*)$/) {
         $self->log->error("child failed to connect");
+        $self->log->error("message: $+{message}\n");
 
         return {
             text    => "$self->{last}?",
@@ -160,7 +161,13 @@ sub connect($self) {
         Socket      => $self->{socket},
         User        => $self->{user},
         Password    => $self->{pass},
-    ) or return 0;
+    );
+
+    if (!defined $self->{client}) {
+        $self->{error} = $@;
+        $self->{error} =~ s/\n/ /g;
+        return 0;
+    }
 
     return defined $self->{client} && $self->{client}->IsConnected;
 }
@@ -170,7 +177,9 @@ sub get_mail($self) {
     close STDOUT;
     close STDERR;
 
-    return "connfail" unless $self->connect;
+    if (!$self->connect) {
+        return "connfail:" . $self->{error};
+    }
 
     my $unseen = 0;
     foreach my $f ($self->{client}->subscribed) {
