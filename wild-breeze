@@ -14,6 +14,7 @@ use Getopt::Long    qw(:config bundling);
 use Pod::Usage;
 use IO::Handle;
 use IO::Select;
+use Time::HiRes qw(gettimeofday);
 use Try::Tiny;
 use YAML::Syck;
 
@@ -141,8 +142,11 @@ while (1) {
 
     $i3->next($data);
 
+    my (undef, $ms) = gettimeofday;
+    my $wait        = $config->{tick} - ($ms / 1000000);
+
     # wait for an event, at most a second by default
-    foreach my $hndl ($select->can_read($config->{tick} // 1)) {
+    foreach my $hndl ($select->can_read($wait)) {
         my $ev_data;
 
         if (!sysread $hndl, $ev_data, 4096) {
